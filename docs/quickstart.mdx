@@ -1,36 +1,31 @@
 ---
 title: Quickstart
-description: Run the docs and the current v1 app locally.
+description: Get started with ipx quickly.
 ---
 
 # Quickstart
 
-## Run the docs locally
-
-```bash
-cd docs
-mint dev
-```
-
-## Run the current app locally
+## Start ipx
 
 ```bash
 cargo run
 ```
 
-## Run quality checks
-
-```bash
-cargo fmt
-cargo test
-cargo build
-```
-
-## Current keyboard controls
+## Move around
 
 - `j` / `↓`: move down
 - `k` / `↑`: move up
-- `p` or `:`: open command palette
-- `r`: request refresh
-- `[` / `]` or tab cycle detail views
+- `[` / `]`: switch inspector views
+- `p` or `:`: open the command palette
+- `r`: refresh
 - `q`: quit
+
+## What you will see
+
+The interface is split into a few core regions:
+- a list of interfaces
+- an inspector panel
+- an event log
+- a status footer
+
+This makes it easy to move through interfaces and keep context while you inspect details.

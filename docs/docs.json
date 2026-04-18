@@ -11,21 +11,13 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Docs",
+        "tab": "User Guide",
         "groups": [
           {
             "group": "Getting started",
             "pages": [
               "index",
               "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Project",
-            "pages": [
-              "product/vision",
-              "reference/tui",
               "essentials/navigation"
             ]
           }

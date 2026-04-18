@@ -1,39 +1,29 @@
 ---
 title: ipx
-description: Keyboard-first macOS network operations console.
+description: A calm, keyboard-first network console for macOS users.
 ---
 
 # ipx
 
-ipx is a keyboard-first macOS network operations console built for engineers.
+ipx helps you inspect macOS network interfaces from a clean keyboard-first terminal interface.
 
-It is designed to feel sharp, fast, and trustworthy, with a terminal experience closer to modern operator tools than to a pile of disconnected shell commands.
+It is built for people who want quick visibility into interface state without jumping through multiple system panels and shell commands.
 
-## v1 scope
+## What ipx is for
 
-Version 1 focuses on a clean inspect-first workflow:
+Use ipx when you want to:
+- see your network interfaces in one place
+- inspect connection state quickly
+- understand which interface is active
+- stay in the terminal while troubleshooting
 
-- interface inventory
-- inspector-driven details
-- event log visibility
-- command palette interaction
-- polished keyboard-first navigation
+## What makes it different
 
-## Design intent
+ipx is designed to feel:
+- focused
+- fast
+- readable
+- calm under pressure
 
-ipx is being built with a few hard constraints:
-
-- clarity beats cleverness
-- reads come before writes
-- risky actions must be explicit
-- the interface should feel calm under pressure
-- the tool should be useful even before mutation features expand
-
-## Why Rust
-
-Rust is the right fit for this tool because it gives us:
-
-- strong terminal app ergonomics
-- a credible path to a serious local binary
-- reliable systems-facing behavior
-- good testing and release discipline
+The goal is not to expose every system detail at once.
+The goal is to make the important information easy to read and easy to navigate.
