@@ -17,7 +17,7 @@ The current interface is split into four regions:
 ## Inspector tabs
 
 ### Overview
-Shows interface identity, status, addressing, and notes.
+Shows identity, status, addressing, and notes.
 
 ### Signals
 Reserved for signal and link-quality surfaces.
@@ -37,3 +37,12 @@ Current v1 commands:
 - `copy`
 - `inspect`
 - `quit`
+
+## Navigation model
+
+The TUI is designed to feel deliberate and operator-grade:
+
+- list movement stays lightweight
+- inspector context is always visible
+- event log captures intent and action history
+- footer keeps commands discoverable

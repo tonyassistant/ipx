@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +73,134 @@ impl NetworkInterface {
         }
 
         lines
+    }
+}
+
+pub fn load_interfaces() -> Vec<NetworkInterface> {
+    discover_macos_interfaces().unwrap_or_else(sample_interfaces)
+}
+
+fn discover_macos_interfaces() -> Option<Vec<NetworkInterface>> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+
+    let output = Command::new("networksetup")
+        .arg("-listallhardwareports")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let text = String::from_utf8(output.stdout).ok()?;
+    let mut interfaces = parse_networksetup_hardwareports(&text);
+    if interfaces.is_empty() {
+        return None;
+    }
+
+    let ifconfig_output = Command::new("ifconfig").output().ok();
+    let ifconfig_text = ifconfig_output
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .unwrap_or_default();
+
+    for iface in &mut interfaces {
+        enrich_from_ifconfig(iface, &ifconfig_text);
+    }
+
+    Some(interfaces)
+}
+
+pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
+    let mut result = Vec::new();
+    let mut name: Option<String> = None;
+    let mut device: Option<String> = None;
+    let mut mac: Option<String> = None;
+
+    for line in input.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("Hardware Port: ") {
+            if let (Some(name), Some(device)) = (name.take(), device.take()) {
+                result.push(NetworkInterface {
+                    kind: classify_kind(&name, &device),
+                    status: InterfaceStatus::Inactive,
+                    ipv4: None,
+                    mac: mac.take(),
+                    notes: vec!["Imported from networksetup".to_string()],
+                    name,
+                    device,
+                });
+            }
+            name = Some(rest.to_string());
+            mac = None;
+        } else if let Some(rest) = trimmed.strip_prefix("Device: ") {
+            device = Some(rest.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("Ethernet Address: ") {
+            mac = Some(rest.to_string());
+        }
+    }
+
+    if let (Some(name), Some(device)) = (name.take(), device.take()) {
+        result.push(NetworkInterface {
+            kind: classify_kind(&name, &device),
+            status: InterfaceStatus::Inactive,
+            ipv4: None,
+            mac,
+            notes: vec!["Imported from networksetup".to_string()],
+            name,
+            device,
+        });
+    }
+
+    result
+}
+
+fn enrich_from_ifconfig(iface: &mut NetworkInterface, ifconfig_text: &str) {
+    let mut in_block = false;
+    for line in ifconfig_text.lines() {
+        if !line.starts_with('\t') && !line.starts_with(' ') {
+            in_block = line.starts_with(&format!("{}:", iface.device));
+            continue;
+        }
+
+        if !in_block {
+            continue;
+        }
+
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("inet ") {
+            let ip = rest.split_whitespace().next().unwrap_or("");
+            if !ip.is_empty() {
+                iface.ipv4 = Some(ip.to_string());
+            }
+        }
+
+        if trimmed.contains("status: active") {
+            iface.status = InterfaceStatus::Connected;
+        } else if trimmed.contains("status: inactive") {
+            iface.status = InterfaceStatus::Inactive;
+        }
+
+        if iface.status == InterfaceStatus::Inactive && trimmed.contains("status:") {
+            iface.status = InterfaceStatus::Disconnected;
+        }
+    }
+}
+
+fn classify_kind(name: &str, device: &str) -> InterfaceKind {
+    let l = format!("{} {}", name.to_lowercase(), device.to_lowercase());
+    if l.contains("wi-fi") || l.contains("airport") || l.contains("wireless") {
+        InterfaceKind::Wireless
+    } else if l.contains("bridge") {
+        InterfaceKind::Bridge
+    } else if l.contains("ethernet") {
+        InterfaceKind::Ethernet
+    } else if l.contains("utun") || l.contains("awdl") || l.contains("llw") || l.contains("virtual")
+    {
+        InterfaceKind::Virtual
+    } else {
+        InterfaceKind::Unknown
     }
 }
 

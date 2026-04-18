@@ -12,9 +12,9 @@ The v1 repository is intentionally small and modular.
 - `src/main.rs`: startup entry point
 - `src/lib.rs`: reusable crate surface
 - `src/app.rs`: state model and interaction behavior
-- `src/network.rs`: interface data model and network-facing abstractions
+- `src/network.rs`: interface data model and macOS discovery logic
 - `src/tui.rs`: rendering and event loop
-- `tests/`: behavioral coverage for core app interactions
+- `tests/`: behavioral and parsing coverage
 - `docs/`: Mintlify documentation
 
 ## Constraints for a network interface CLI
@@ -31,10 +31,6 @@ That means:
 
 ## Current v1 posture
 
-The current app is read-heavy by design.
+The current app prefers real macOS discovery when available and falls back to a deterministic sample model when it is not.
 
-That gives us a stable base before we add:
-- interface toggles
-- DHCP renew flows
-- Wi-Fi action surfaces
-- confirmation-driven mutating commands
+That gives us a stable operator surface while the mutation layer is still being developed.
