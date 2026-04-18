@@ -63,3 +63,27 @@ fn palette_open_close_changes_focus() {
     app.close_palette();
     assert_eq!(app.focus, Focus::List);
 }
+
+#[test]
+fn interface_counts_match_sample_data() {
+    let app = App::new(sample_interfaces());
+    let counts = app.interface_counts();
+    assert_eq!(counts.connected, 1);
+    assert_eq!(counts.disconnected, 1);
+    assert_eq!(counts.inactive, 1);
+}
+
+#[test]
+fn selection_label_tracks_selected_row() {
+    let mut app = App::new(sample_interfaces());
+    assert_eq!(app.selection_label(), "1/3");
+    app.selected = 2;
+    assert_eq!(app.selection_label(), "3/3");
+}
+
+#[test]
+fn palette_suggestions_include_operator_commands() {
+    let app = App::new(sample_interfaces());
+    assert!(app.palette_suggestions().contains(&"refresh"));
+    assert!(app.palette_suggestions().contains(&"quit"));
+}
