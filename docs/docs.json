@@ -24,6 +24,8 @@
           {
             "group": "Project",
             "pages": [
+              "product/vision",
+              "reference/tui",
               "essentials/navigation"
             ]
           }
