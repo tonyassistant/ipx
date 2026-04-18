@@ -1,0 +1,15 @@
+[package]
+name = "ipx"
+version = "0.1.0"
+edition = "2021"
+description = "Keyboard-first macOS network operations TUI"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+crossterm = "0.27"
+ratatui = "0.26"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+pretty_assertions = "1"
