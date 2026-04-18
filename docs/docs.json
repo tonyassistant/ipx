@@ -11,10 +11,10 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "User Guide",
+        "tab": "Guide",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Start",
             "pages": [
               "index",
               "quickstart",
@@ -27,16 +27,12 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Repository",
+          "anchor": "GitHub",
           "href": "https://github.com/tonyassistant/ipx",
           "icon": "github"
         }
       ]
     }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
   },
   "navbar": {
     "links": [
@@ -47,7 +43,7 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Open Repository",
+      "label": "Repository",
       "href": "https://github.com/tonyassistant/ipx"
     }
   },
