@@ -95,10 +95,12 @@ pub struct NetworkInterface {
 }
 
 impl NetworkInterface {
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         format!("{} ({}) [{}]", self.name, self.device, self.status.label())
     }
 
+    #[allow(dead_code)]
     pub fn detail_lines(&self) -> Vec<String> {
         let mut lines = vec![
             format!("Name: {}", self.name),

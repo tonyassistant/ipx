@@ -1,4 +1,4 @@
-use crate::network::NetworkInterface;
+use crate::network::{InterfaceStatus, NetworkInterface};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
@@ -37,6 +37,13 @@ impl DetailTab {
             Self::Actions => Self::Signals,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InterfaceCounts {
+    pub connected: usize,
+    pub disconnected: usize,
+    pub inactive: usize,
 }
 
 #[derive(Debug)]
@@ -99,6 +106,36 @@ impl App {
         self.interfaces.get(self.selected)
     }
 
+    pub fn selection_label(&self) -> String {
+        if self.interfaces.is_empty() {
+            "No interfaces".to_string()
+        } else {
+            format!("{}/{}", self.selected + 1, self.interfaces.len())
+        }
+    }
+
+    pub fn interface_counts(&self) -> InterfaceCounts {
+        self.interfaces.iter().fold(
+            InterfaceCounts {
+                connected: 0,
+                disconnected: 0,
+                inactive: 0,
+            },
+            |mut counts, iface| {
+                match iface.status {
+                    InterfaceStatus::Connected => counts.connected += 1,
+                    InterfaceStatus::Disconnected => counts.disconnected += 1,
+                    InterfaceStatus::Inactive => counts.inactive += 1,
+                }
+                counts
+            },
+        )
+    }
+
+    pub fn palette_suggestions(&self) -> &'static [&'static str] {
+        &["refresh", "reload", "help", "copy", "inspect", "quit"]
+    }
+
     pub fn open_palette(&mut self) {
         self.focus = Focus::Palette;
         self.palette.clear();
@@ -158,6 +195,6 @@ impl App {
     }
 
     pub fn shortcuts(&self) -> &'static str {
-        "j/k move • tab cycle pane • [/] cycle details • r refresh • p or : palette • q quit"
+        "j/k move • [/] details • r refresh • p or : palette • enter run • esc close • q quit"
     }
 }
