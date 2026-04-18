@@ -1,29 +1,40 @@
 ---
 title: Development
-description: How we are approaching the project right now.
+description: Current implementation direction for ipx v1.
 ---
 
 # Development
 
-## Current phase
+## Repository structure
 
-ipx is being rebuilt from a clean slate.
+The v1 repository is intentionally small and modular.
 
-That means we are intentionally focusing on:
-- good documentation structure
-- product clarity
-- a clean foundation before implementation expands again
+- `src/main.rs`: startup entry point
+- `src/lib.rs`: reusable crate surface
+- `src/app.rs`: state model and interaction behavior
+- `src/network.rs`: interface data model and network-facing abstractions
+- `src/tui.rs`: rendering and event loop
+- `tests/`: behavioral coverage for core app interactions
+- `docs/`: Mintlify documentation
 
-## Principles
+## Constraints for a network interface CLI
 
-1. keep the interface keyboard-first
-2. prefer operational clarity over visual noise
-3. document intent early
-4. make risky actions explicit
-5. design for engineers, not demos
+A macOS network interface tool should be conservative.
 
-## Near-term priorities
+That means:
 
-- establish polished docs
-- define v1 scope clearly
-- rebuild implementation against that scope
+1. inspect first
+2. avoid hidden mutation
+3. make state visible before action
+4. require explicit confirmation before disruptive operations
+5. degrade gracefully when system-specific data is unavailable
+
+## Current v1 posture
+
+The current app is read-heavy by design.
+
+That gives us a stable base before we add:
+- interface toggles
+- DHCP renew flows
+- Wi-Fi action surfaces
+- confirmation-driven mutating commands

@@ -1,32 +1,36 @@
 ---
 title: Quickstart
-description: Get the docs and local workflow running quickly.
+description: Run the docs and the current v1 app locally.
 ---
 
 # Quickstart
 
-## Local docs preview
-
-From the repository root:
+## Run the docs locally
 
 ```bash
 cd docs
 mint dev
 ```
 
-## What you should expect
+## Run the current app locally
 
-The Mintlify preview gives you:
-- live reload
-- navigation validation
-- early feedback on docs structure
-- a fast environment for iterating on content
+```bash
+cargo run
+```
 
-## Current repository shape
+## Run quality checks
 
-Right now, the docs are the main asset being rebuilt.
+```bash
+cargo fmt
+cargo test
+cargo build
+```
 
-The product itself is in a fresh-start state, so the documentation is being used to define:
-- product intent
-- information architecture
-- future implementation direction
+## Current keyboard controls
+
+- `j` / `↓`: move down
+- `k` / `↑`: move up
+- `p` or `:`: open command palette
+- `r`: request refresh
+- `[` / `]` or tab cycle detail views
+- `q`: quit
