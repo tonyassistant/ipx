@@ -11,6 +11,7 @@ Current foundations in the repo:
 - modular TUI architecture
 - macOS-oriented interface discovery with fallback sample data
 - command palette shell
+- safe v1 action framework with confirmation gates for risky network operations
 - event log and inspector layout
 - test coverage for app behavior and parsing
 
@@ -48,6 +49,11 @@ For v1, ipx should:
 - make risky actions explicit
 - feel calm and operator-grade
 - support a polished macOS-native workflow for network inspection
+
+The Actions tab now exposes a small safe-action catalog:
+- read-only actions execute immediately
+- risky actions require an explicit confirmation gate
+- mutating network changes remain blocked in v1 even after confirmation
 
 ## CI/CD note
 

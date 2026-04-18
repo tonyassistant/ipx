@@ -1,4 +1,10 @@
-use crate::network::{InterfaceStatus, NetworkInterface};
+use crate::{
+    actions::{
+        action_catalog, execute_action, pending_confirmation, ActionEffect, ActionKind, ActionSpec,
+        PendingConfirmation,
+    },
+    network::{InterfaceStatus, NetworkInterface},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
@@ -57,6 +63,8 @@ pub struct App {
     pub log: Vec<String>,
     pub should_quit: bool,
     pub status_line: String,
+    pub action_selected: usize,
+    pub pending_confirmation: Option<PendingConfirmation>,
 }
 
 impl App {
@@ -71,12 +79,15 @@ impl App {
             log: vec!["ipx initialized".to_string()],
             should_quit: false,
             status_line: "Ready".to_string(),
+            action_selected: 0,
+            pending_confirmation: None,
         }
     }
 
     pub fn next(&mut self) {
         if !self.interfaces.is_empty() {
             self.selected = (self.selected + 1) % self.interfaces.len();
+            self.action_selected = 0;
             self.status_line = format!(
                 "Selected {}",
                 self.selected_interface()
@@ -93,6 +104,7 @@ impl App {
             } else {
                 self.selected - 1
             };
+            self.action_selected = 0;
             self.status_line = format!(
                 "Selected {}",
                 self.selected_interface()
@@ -133,7 +145,9 @@ impl App {
     }
 
     pub fn palette_suggestions(&self) -> &'static [&'static str] {
-        &["refresh", "reload", "help", "copy", "inspect", "quit"]
+        &[
+            "refresh", "reload", "help", "copy", "inspect", "renew", "quit",
+        ]
     }
 
     pub fn open_palette(&mut self) {
@@ -145,7 +159,9 @@ impl App {
     pub fn close_palette(&mut self) {
         self.focus = Focus::List;
         self.palette.clear();
-        self.status_line = "Ready".to_string();
+        if self.pending_confirmation.is_none() {
+            self.status_line = "Ready".to_string();
+        }
     }
 
     pub fn next_tab(&mut self) {
@@ -157,8 +173,113 @@ impl App {
     }
 
     pub fn request_refresh(&mut self) {
-        self.log.push("refresh requested".to_string());
-        self.status_line = "Refresh requested".to_string();
+        self.invoke_action(ActionKind::RefreshState);
+    }
+
+    pub fn action_specs(&self) -> Vec<ActionSpec> {
+        self.selected_interface()
+            .map(action_catalog)
+            .unwrap_or_default()
+    }
+
+    pub fn selected_action(&self) -> Option<ActionSpec> {
+        let actions = self.action_specs();
+        actions.get(self.action_selected).cloned()
+    }
+
+    pub fn next_action(&mut self) {
+        let len = self.action_specs().len();
+        if len > 0 {
+            self.action_selected = (self.action_selected + 1) % len;
+        }
+    }
+
+    pub fn previous_action(&mut self) {
+        let len = self.action_specs().len();
+        if len > 0 {
+            self.action_selected = if self.action_selected == 0 {
+                len - 1
+            } else {
+                self.action_selected - 1
+            };
+        }
+    }
+
+    pub fn invoke_selected_action(&mut self) {
+        if let Some(spec) = self.selected_action() {
+            self.invoke_action_spec(spec);
+        }
+    }
+
+    pub fn invoke_action(&mut self, kind: ActionKind) {
+        if let Some(iface) = self.selected_interface() {
+            let spec = ActionSpec::for_interface(kind, iface);
+            self.invoke_action_spec(spec);
+        }
+    }
+
+    fn invoke_action_spec(&mut self, spec: ActionSpec) {
+        let Some(iface) = self.selected_interface().cloned() else {
+            return;
+        };
+
+        if matches!(spec.safety, crate::actions::ActionSafety::ConfirmRequired) {
+            self.pending_confirmation = Some(pending_confirmation(spec.clone(), &iface));
+            self.status_line = format!("Confirmation required for {}", spec.title);
+            self.log.push(format!(
+                "awaiting confirmation: {} on {}",
+                spec.title, iface.name
+            ));
+            return;
+        }
+
+        self.apply_execution(execute_action(&spec, &iface));
+    }
+
+    pub fn confirm_pending_action(&mut self) {
+        let Some(pending) = self.pending_confirmation.take() else {
+            return;
+        };
+
+        let iface = self
+            .selected_interface()
+            .cloned()
+            .filter(|iface| iface.name == pending.interface_name);
+
+        if let Some(iface) = iface {
+            self.log.push(format!(
+                "confirmed action: {} on {}",
+                pending.action.title, iface.name
+            ));
+            self.apply_execution(execute_action(&pending.action, &iface));
+        } else {
+            self.log.push(format!(
+                "confirmation expired: {} target changed",
+                pending.action.title
+            ));
+            self.status_line = "Confirmation expired".to_string();
+        }
+    }
+
+    pub fn cancel_pending_action(&mut self) {
+        if let Some(pending) = self.pending_confirmation.take() {
+            self.log.push(format!(
+                "cancelled action: {} on {}",
+                pending.action.title, pending.interface_name
+            ));
+            self.status_line = format!("Cancelled {}", pending.action.title);
+        }
+    }
+
+    fn apply_execution(&mut self, execution: crate::actions::ActionExecution) {
+        self.log.push(execution.log_entry);
+        self.status_line = execution.status_line;
+        match execution.effect {
+            ActionEffect::Refresh => {}
+            ActionEffect::CopySummary => {}
+            ActionEffect::FocusOverview => self.detail_tab = DetailTab::Overview,
+            ActionEffect::Noop => {}
+        }
     }
 
     pub fn execute_palette(&mut self) {
@@ -168,22 +289,17 @@ impl App {
         }
 
         match command.as_str() {
-            "refresh" | "reload" => self.request_refresh(),
+            "refresh" | "reload" => self.invoke_action(ActionKind::RefreshState),
             "help" => {
                 self.log.push(
-                    "available commands: refresh, reload, help, copy, inspect, quit".to_string(),
+                    "available commands: refresh, reload, help, copy, inspect, renew, quit"
+                        .to_string(),
                 );
                 self.status_line = "Help opened in event log".to_string();
             }
-            "copy" => {
-                self.log
-                    .push("copy requested for selected interface".to_string());
-                self.status_line = "Copy action queued".to_string();
-            }
-            "inspect" => {
-                self.detail_tab = DetailTab::Overview;
-                self.status_line = "Inspector focused".to_string();
-            }
+            "copy" => self.invoke_action(ActionKind::CopySummary),
+            "inspect" => self.invoke_action(ActionKind::InspectServices),
+            "renew" => self.invoke_action(ActionKind::RenewDhcpLease),
             "quit" | "exit" => self.should_quit = true,
             "" => {}
             other => {
@@ -195,6 +311,6 @@ impl App {
     }
 
     pub fn shortcuts(&self) -> &'static str {
-        "j/k move • [/] details • r refresh • p or : palette • enter run • esc close • q quit"
+        "j/k move • [/] details • a/s actions • enter run/confirm • esc cancel • p or : palette • q quit"
     }
 }

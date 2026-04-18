@@ -13,6 +13,7 @@ use ratatui::{
 };
 
 use crate::{
+    actions::ActionSafety,
     app::{App, DetailTab, Focus},
     network::{InterfaceStatus, NetworkInterface},
 };
@@ -51,6 +52,22 @@ fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App
                             KeyCode::Char('k') | KeyCode::Up => app.previous(),
                             KeyCode::Char('p') | KeyCode::Char(':') => app.open_palette(),
                             KeyCode::Char('r') => app.request_refresh(),
+                            KeyCode::Char('a') if app.detail_tab == DetailTab::Actions => {
+                                app.previous_action()
+                            }
+                            KeyCode::Char('s') if app.detail_tab == DetailTab::Actions => {
+                                app.next_action()
+                            }
+                            KeyCode::Enter => {
+                                if app.pending_confirmation.is_some() {
+                                    app.confirm_pending_action();
+                                } else if app.detail_tab == DetailTab::Actions {
+                                    app.invoke_selected_action();
+                                }
+                            }
+                            KeyCode::Esc if app.pending_confirmation.is_some() => {
+                                app.cancel_pending_action()
+                            }
                             KeyCode::Tab | KeyCode::Char(']') => app.next_tab(),
                             KeyCode::BackTab | KeyCode::Char('[') => app.previous_tab(),
                             _ => {}
@@ -95,6 +112,10 @@ fn draw(frame: &mut Frame, app: &App) {
 
     if app.focus == Focus::Palette {
         draw_palette(frame, app, area);
+    }
+
+    if app.pending_confirmation.is_some() {
+        draw_confirmation(frame, app, area);
     }
 }
 
@@ -340,7 +361,7 @@ fn detail_lines(app: &App) -> Vec<Line<'static>> {
             .unwrap_or_else(|| vec![Line::from("No interface selected")]),
         DetailTab::Actions => app
             .selected_interface()
-            .map(action_lines)
+            .map(|iface| action_lines(app, iface))
             .unwrap_or_else(|| vec![Line::from("No interface selected")]),
     }
 }
@@ -397,17 +418,41 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
     ]
 }
 
-fn action_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
-    vec![
-        section_line("Safe actions"),
-        bullet_line(format!("Refresh {} state", iface.name)),
-        bullet_line(format!("Copy {} summary", iface.device)),
-        bullet_line("Inspect mapped network services".to_string()),
+fn action_lines(app: &App, iface: &NetworkInterface) -> Vec<Line<'static>> {
+    let mut lines = vec![section_line("Safe actions")];
+
+    for (idx, action) in app.action_specs().into_iter().enumerate() {
+        let marker = if idx == app.action_selected {
+            "▶"
+        } else {
+            "•"
+        };
+        let suffix = if action.enabled {
+            action.safety.label().to_string()
+        } else {
+            format!("{} • blocked in v1", action.safety.label())
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("{marker} "), Style::default().fg(Color::Cyan)),
+            Span::styled(action.title, Style::default().fg(Color::White)),
+            Span::styled(format!(" ({suffix})"), Style::default().fg(OPERATOR_MUTED)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(action.description, Style::default().fg(OPERATOR_MUTED)),
+        ]));
+    }
+
+    lines.extend([
         Line::from(""),
         section_line("Guardrails"),
-        bullet_line("Mutating actions remain disabled in v1".to_string()),
-        bullet_line("Confirmation gates will appear before risky changes".to_string()),
-    ]
+        bullet_line(format!("Read-first workflow anchored on {}", iface.name)),
+        bullet_line("Read-only actions execute immediately".to_string()),
+        bullet_line("Mutating actions require explicit confirmation".to_string()),
+        bullet_line("Live network changes remain disabled in v1".to_string()),
+    ]);
+
+    lines
 }
 
 fn kv_line(label: &str, value: String) -> Line<'static> {
@@ -466,6 +511,71 @@ fn status_style(status: &InterfaceStatus) -> Style {
         InterfaceStatus::Disconnected => Style::default().fg(OPERATOR_AMBER),
         InterfaceStatus::Inactive => Style::default().fg(OPERATOR_MUTED),
     }
+}
+
+fn draw_confirmation(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(pending) = &app.pending_confirmation else {
+        return;
+    };
+
+    let popup = centered_rect(64, 26, area);
+    frame.render_widget(Clear, popup);
+
+    let sections = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(3),
+        Constraint::Min(3),
+        Constraint::Length(2),
+    ])
+    .margin(1)
+    .split(popup);
+
+    let shell = Block::default()
+        .borders(Borders::ALL)
+        .title("Confirmation Gate")
+        .border_style(Style::default().fg(OPERATOR_AMBER))
+        .style(Style::default().bg(OPERATOR_SURFACE));
+    frame.render_widget(shell, popup);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("Action ", Style::default().fg(OPERATOR_MUTED)),
+            Span::styled(
+                pending.action.title.as_str(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ])),
+        sections[0],
+    );
+
+    frame.render_widget(
+        Paragraph::new(pending.prompt.as_str()).wrap(Wrap { trim: true }),
+        sections[1],
+    );
+
+    let safety = match pending.action.safety {
+        ActionSafety::ReadOnly => "read-only",
+        ActionSafety::ConfirmRequired => "confirm required",
+    };
+    frame.render_widget(
+        Paragraph::new(vec![
+            bullet_line(format!("Target {}", pending.interface_name)),
+            bullet_line(format!("Safety posture {safety}")),
+            bullet_line(if pending.action.enabled {
+                "Execution available".to_string()
+            } else {
+                "Execution remains blocked in v1 after confirmation".to_string()
+            }),
+        ]),
+        sections[2],
+    );
+
+    frame.render_widget(
+        Paragraph::new("enter confirm • esc cancel").style(Style::default().fg(OPERATOR_MUTED)),
+        sections[3],
+    );
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

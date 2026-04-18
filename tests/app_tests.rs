@@ -85,5 +85,6 @@ fn selection_label_tracks_selected_row() {
 fn palette_suggestions_include_operator_commands() {
     let app = App::new(sample_interfaces());
     assert!(app.palette_suggestions().contains(&"refresh"));
+    assert!(app.palette_suggestions().contains(&"renew"));
     assert!(app.palette_suggestions().contains(&"quit"));
 }
