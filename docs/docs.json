@@ -22,47 +22,9 @@
             ]
           },
           {
-            "group": "Writing",
+            "group": "Project",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
               "essentials/navigation"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API",
-        "groups": [
-          {
-            "group": "Reference",
-            "pages": [
-              "api-reference/introduction",
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "AI Tools",
-        "groups": [
-          {
-            "group": "Editors",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
             ]
           }
         ]
@@ -74,11 +36,6 @@
           "anchor": "Repository",
           "href": "https://github.com/tonyassistant/ipx",
           "icon": "github"
-        },
-        {
-          "anchor": "Mintlify Docs",
-          "href": "https://www.mintlify.com/docs",
-          "icon": "book-open-cover"
         }
       ]
     }
@@ -99,18 +56,6 @@
       "label": "Open Repository",
       "href": "https://github.com/tonyassistant/ipx"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
