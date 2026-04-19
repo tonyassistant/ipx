@@ -52,6 +52,7 @@ fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App
                             KeyCode::Char('k') | KeyCode::Up => app.previous(),
                             KeyCode::Char('p') | KeyCode::Char(':') => app.open_palette(),
                             KeyCode::Char('r') => app.request_refresh(),
+                            KeyCode::Char('v') => app.cycle_interface_visibility(),
                             KeyCode::Char('a') if app.detail_tab == DetailTab::Actions => {
                                 app.previous_action()
                             }
@@ -158,6 +159,14 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
                 format!("SELECTION {}", app.selection_label()),
                 Style::default().fg(Color::White),
             ),
+            "  ".into(),
+            Span::styled(
+                format!(
+                    "VISIBILITY {}",
+                    app.interface_visibility.title().to_uppercase()
+                ),
+                Style::default().fg(OPERATOR_MUTED),
+            ),
         ]),
     ])
     .block(
@@ -171,14 +180,24 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_interface_list(frame: &mut Frame, app: &App, area: Rect) {
-    let items: Vec<ListItem> = app
-        .interfaces
-        .iter()
-        .enumerate()
-        .map(|(idx, iface)| ListItem::new(interface_row(iface, idx == app.selected)))
-        .collect();
+    let visible = app.visible_interfaces();
+    let items: Vec<ListItem> = if visible.is_empty() {
+        vec![ListItem::new(Line::from(Span::styled(
+            "No interfaces match the current visibility filter",
+            Style::default().fg(OPERATOR_MUTED),
+        )))]
+    } else {
+        visible
+            .iter()
+            .map(|(idx, iface)| ListItem::new(interface_row(iface, *idx == app.selected)))
+            .collect()
+    };
 
-    let title = format!("Interfaces [{}]", app.interfaces.len());
+    let title = format!(
+        "Interfaces [{} visible / {} total]",
+        visible.len(),
+        app.interfaces.len()
+    );
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)

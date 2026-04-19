@@ -51,7 +51,8 @@ cargo run
 ```
 
 The current TUI flow is:
-- `j` / `k` or arrow keys move through interfaces
+- `j` / `k` or arrow keys move through visible interfaces
+- `v` cycles interface visibility between all, active, and inactive
 - `[` / `]` or `Shift+Tab` / `Tab` switch inspector views
 - `a` / `s` move through actions in the Actions view
 - `p` or `:` opens the command palette

@@ -52,6 +52,39 @@ pub struct InterfaceCounts {
     pub inactive: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterfaceVisibility {
+    All,
+    ActiveOnly,
+    InactiveOnly,
+}
+
+impl InterfaceVisibility {
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::ActiveOnly => "active",
+            Self::InactiveOnly => "inactive",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::All => Self::ActiveOnly,
+            Self::ActiveOnly => Self::InactiveOnly,
+            Self::InactiveOnly => Self::All,
+        }
+    }
+
+    pub fn includes(&self, status: &InterfaceStatus) -> bool {
+        match self {
+            Self::All => true,
+            Self::ActiveOnly => *status != InterfaceStatus::Inactive,
+            Self::InactiveOnly => *status == InterfaceStatus::Inactive,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct App {
     pub interfaces: Vec<NetworkInterface>,
@@ -66,6 +99,7 @@ pub struct App {
     pub action_selected: usize,
     pub pending_confirmation: Option<PendingConfirmation>,
     pub palette_selected: usize,
+    pub interface_visibility: InterfaceVisibility,
 }
 
 impl App {
@@ -83,48 +117,96 @@ impl App {
             action_selected: 0,
             pending_confirmation: None,
             palette_selected: 0,
+            interface_visibility: InterfaceVisibility::All,
         }
     }
 
     pub fn next(&mut self) {
-        if !self.interfaces.is_empty() {
-            self.selected = (self.selected + 1) % self.interfaces.len();
-            self.action_selected = 0;
-            self.status_line = format!(
-                "Selected {}",
-                self.selected_interface()
-                    .map(|i| i.name.clone())
-                    .unwrap_or_default()
-            );
+        let visible = self.visible_interface_indexes();
+        if visible.is_empty() {
+            return;
         }
+
+        let current_position = visible
+            .iter()
+            .position(|&idx| idx == self.selected)
+            .unwrap_or(0);
+        let next_position = (current_position + 1) % visible.len();
+        self.selected = visible[next_position];
+        self.action_selected = 0;
+        self.status_line = format!(
+            "Selected {}",
+            self.selected_interface()
+                .map(|i| i.name.clone())
+                .unwrap_or_default()
+        );
     }
 
     pub fn previous(&mut self) {
-        if !self.interfaces.is_empty() {
-            self.selected = if self.selected == 0 {
-                self.interfaces.len() - 1
-            } else {
-                self.selected - 1
-            };
-            self.action_selected = 0;
-            self.status_line = format!(
-                "Selected {}",
-                self.selected_interface()
-                    .map(|i| i.name.clone())
-                    .unwrap_or_default()
-            );
+        let visible = self.visible_interface_indexes();
+        if visible.is_empty() {
+            return;
         }
+
+        let current_position = visible
+            .iter()
+            .position(|&idx| idx == self.selected)
+            .unwrap_or(0);
+        let previous_position = if current_position == 0 {
+            visible.len() - 1
+        } else {
+            current_position - 1
+        };
+        self.selected = visible[previous_position];
+        self.action_selected = 0;
+        self.status_line = format!(
+            "Selected {}",
+            self.selected_interface()
+                .map(|i| i.name.clone())
+                .unwrap_or_default()
+        );
+    }
+
+    pub fn visible_interface_indexes(&self) -> Vec<usize> {
+        self.interfaces
+            .iter()
+            .enumerate()
+            .filter(|(_, iface)| self.interface_visibility.includes(&iface.status))
+            .map(|(idx, _)| idx)
+            .collect()
+    }
+
+    pub fn visible_interfaces(&self) -> Vec<(usize, &NetworkInterface)> {
+        self.visible_interface_indexes()
+            .into_iter()
+            .filter_map(|idx| self.interfaces.get(idx).map(|iface| (idx, iface)))
+            .collect()
     }
 
     pub fn selected_interface(&self) -> Option<&NetworkInterface> {
-        self.interfaces.get(self.selected)
+        let visible = self.visible_interface_indexes();
+        if visible.is_empty() {
+            return None;
+        }
+
+        if visible.contains(&self.selected) {
+            self.interfaces.get(self.selected)
+        } else {
+            self.interfaces.get(*visible.first().unwrap_or(&0))
+        }
     }
 
     pub fn selection_label(&self) -> String {
-        if self.interfaces.is_empty() {
-            "No interfaces".to_string()
+        let visible = self.visible_interface_indexes();
+        if visible.is_empty() {
+            "No visible interfaces".to_string()
         } else {
-            format!("{}/{}", self.selected + 1, self.interfaces.len())
+            let current = visible
+                .iter()
+                .position(|&idx| idx == self.selected)
+                .map(|idx| idx + 1)
+                .unwrap_or(1);
+            format!("{current}/{}", visible.len())
         }
     }
 
@@ -148,7 +230,16 @@ impl App {
 
     pub fn palette_suggestions(&self) -> &'static [&'static str] {
         &[
-            "refresh", "reload", "help", "copy", "inspect", "renew", "quit",
+            "refresh",
+            "reload",
+            "show all",
+            "show active",
+            "show inactive",
+            "help",
+            "copy",
+            "inspect",
+            "renew",
+            "quit",
         ]
     }
 
@@ -205,6 +296,37 @@ impl App {
 
     pub fn request_refresh(&mut self) {
         self.invoke_action(ActionKind::RefreshState);
+    }
+
+    pub fn cycle_interface_visibility(&mut self) {
+        self.set_interface_visibility(self.interface_visibility.next());
+    }
+
+    pub fn set_interface_visibility(&mut self, visibility: InterfaceVisibility) {
+        self.interface_visibility = visibility;
+        self.pending_confirmation = None;
+        self.action_selected = 0;
+
+        if let Some(first_visible) = self.visible_interface_indexes().first().copied() {
+            self.selected = first_visible;
+            if let Some(iface) = self.interfaces.get(first_visible) {
+                self.status_line = format!(
+                    "Showing {} interfaces, selected {}",
+                    self.interface_visibility.title(),
+                    iface.name
+                );
+            }
+        } else {
+            self.status_line = format!(
+                "Showing {} interfaces, none available",
+                self.interface_visibility.title()
+            );
+        }
+
+        self.log.push(format!(
+            "interface visibility set to {}",
+            self.interface_visibility.title()
+        ));
     }
 
     pub fn action_specs(&self) -> Vec<ActionSpec> {
@@ -379,11 +501,14 @@ impl App {
             "refresh" | "reload" => self.invoke_action(ActionKind::RefreshState),
             "help" => {
                 self.log.push(
-                    "available commands: refresh, reload, help, copy, inspect, renew, quit"
+                    "available commands: refresh, reload, show all, show active, show inactive, help, copy, inspect, renew, quit"
                         .to_string(),
                 );
                 self.status_line = "Help opened in event log".to_string();
             }
+            "show all" => self.set_interface_visibility(InterfaceVisibility::All),
+            "show active" => self.set_interface_visibility(InterfaceVisibility::ActiveOnly),
+            "show inactive" => self.set_interface_visibility(InterfaceVisibility::InactiveOnly),
             "copy" => self.invoke_action(ActionKind::CopySummary),
             "inspect" => self.invoke_action(ActionKind::InspectServices),
             "renew" => self.invoke_action(ActionKind::RenewDhcpLease),
@@ -399,7 +524,7 @@ impl App {
     }
 
     pub fn shortcuts(&self) -> &'static str {
-        "j/k move • [/] details • a/s actions • enter run/confirm • esc cancel • p or : palette • q quit"
+        "j/k move • v visibility • [/] details • a/s actions • enter run/confirm • esc cancel • p or : palette • q quit"
     }
 }
 

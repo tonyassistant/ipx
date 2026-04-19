@@ -5,7 +5,7 @@ This file tracks short public execution notes for the repository.
 ## Current status
 
 - Focus: release/install reliability and product polish
-- Near-term work: command palette autocomplete and keyboard flow improved, next up interface visibility, feedback improvements, and broader platform support
+- Near-term work: command palette autocomplete and interface visibility filtering shipped, next up post-action feedback, reachability checks, and broader platform support
 
 ## Operating notes
 

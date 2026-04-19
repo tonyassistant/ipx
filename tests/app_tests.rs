@@ -1,4 +1,4 @@
-use ipx::app::{App, DetailTab, Focus};
+use ipx::app::{App, DetailTab, Focus, InterfaceVisibility};
 use ipx::network::sample_interfaces;
 
 #[test]
@@ -105,8 +105,48 @@ fn selection_label_tracks_selected_row() {
 fn palette_suggestions_include_operator_commands() {
     let app = App::new(sample_interfaces());
     assert!(app.palette_suggestions().contains(&"refresh"));
+    assert!(app.palette_suggestions().contains(&"show active"));
     assert!(app.palette_suggestions().contains(&"renew"));
     assert!(app.palette_suggestions().contains(&"quit"));
+}
+
+#[test]
+fn can_filter_to_active_interfaces_only() {
+    let mut app = App::new(sample_interfaces());
+    app.set_interface_visibility(InterfaceVisibility::ActiveOnly);
+
+    let visible = app.visible_interfaces();
+    assert_eq!(visible.len(), 2);
+    assert!(visible
+        .iter()
+        .all(|(_, iface)| iface.status != ipx::network::InterfaceStatus::Inactive));
+    assert_eq!(app.selection_label(), "1/2");
+}
+
+#[test]
+fn can_filter_to_inactive_interfaces_only() {
+    let mut app = App::new(sample_interfaces());
+    app.set_interface_visibility(InterfaceVisibility::InactiveOnly);
+
+    let visible = app.visible_interfaces();
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].1.name, "Thunderbolt Bridge");
+    assert_eq!(app.selection_label(), "1/1");
+}
+
+#[test]
+fn cycling_visibility_rotates_through_modes() {
+    let mut app = App::new(sample_interfaces());
+    assert_eq!(app.interface_visibility, InterfaceVisibility::All);
+
+    app.cycle_interface_visibility();
+    assert_eq!(app.interface_visibility, InterfaceVisibility::ActiveOnly);
+
+    app.cycle_interface_visibility();
+    assert_eq!(app.interface_visibility, InterfaceVisibility::InactiveOnly);
+
+    app.cycle_interface_visibility();
+    assert_eq!(app.interface_visibility, InterfaceVisibility::All);
 }
 
 #[test]
@@ -118,6 +158,21 @@ fn filtered_palette_suggestions_prefer_prefix_matches() {
         app.filtered_palette_suggestions(),
         vec!["renew", "reload", "refresh"]
     );
+}
+
+#[test]
+fn palette_can_switch_visibility_modes() {
+    let mut app = App::new(sample_interfaces());
+    app.open_palette();
+    app.palette = "show inactive".into();
+    app.execute_palette();
+
+    assert_eq!(app.interface_visibility, InterfaceVisibility::InactiveOnly);
+    assert_eq!(app.selection_label(), "1/1");
+    assert!(app
+        .log
+        .iter()
+        .any(|entry| entry.contains("interface visibility set to inactive")));
 }
 
 #[test]
