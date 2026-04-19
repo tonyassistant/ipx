@@ -1,0 +1,26 @@
+---
+title: Network discovery
+description: How ipx understands the local macOS network surface.
+---
+
+# Network discovery
+
+On macOS, ipx builds its view from system networking commands.
+
+## Current discovery sources
+
+- `networksetup -listallhardwareports`
+- `networksetup -listnetworkserviceorder`
+- `ifconfig`
+
+## What this enables
+
+ipx can currently map:
+
+- hardware ports to devices
+- services to interfaces
+- basic addressing and status information
+
+## v1 expectation
+
+This is enough for a strong inspect-first v1, while deeper signal and service-state fidelity can continue to improve over time.

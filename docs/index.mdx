@@ -1,0 +1,46 @@
+---
+title: ipx
+description: Keyboard-first macOS network visibility in one calm terminal interface.
+---
+
+# ipx
+
+ipx is a keyboard-first macOS network console.
+
+It brings interface state, service mapping, actions, and event feedback into one place so you can inspect the network without bouncing between multiple tools.
+
+Install it with Homebrew:
+
+```bash
+brew install tonyassistant/homebrew-tap/ipx
+```
+
+## What it does
+
+ipx currently gives you:
+
+- a list of detected interfaces
+- an inspector with focused views
+- mapped macOS network services
+- a small safe action surface
+- a command palette for quick commands
+- an event log that keeps context visible
+
+## What it is for
+
+Use ipx when you want a faster way to understand:
+
+- which interface is active
+- how macOS services map to interfaces
+- what the current address and link posture looks like
+- what actions are available without guessing
+
+## v1 principles
+
+ipx v1 is intentionally inspect-first.
+
+That means:
+- important information is visible by default
+- navigation is keyboard-first
+- risky actions are explicit
+- live network mutation stays conservative

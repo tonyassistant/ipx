@@ -1,0 +1,35 @@
+---
+title: Actions
+description: Understand what actions exist and how guardrails work.
+---
+
+# Actions
+
+ipx exposes a small action surface for the selected interface.
+
+The goal is to make available operations obvious while keeping risky behavior guarded.
+
+## Available actions
+
+### Refresh state
+Reloads the current interface posture.
+
+### Copy summary
+Records a concise summary action for the selected interface.
+
+### Inspect services
+Returns attention to service information for the selected interface.
+
+### Renew DHCP lease
+Requires confirmation and remains blocked in v1.
+
+## Safety model
+
+ipx uses two action classes:
+
+- read-only
+- confirm required
+
+Read-only actions run immediately.
+
+Actions that could change live network state require an explicit confirmation step first.

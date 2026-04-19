@@ -1,0 +1,126 @@
+name: release
+
+"on":
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            archive: ipx-aarch64-apple-darwin.tar.gz
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            archive: ipx-x86_64-apple-darwin.tar.gz
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Package archive
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/ipx dist/ipx
+          tar -C dist -czf ${{ matrix.archive }} ipx
+      - name: Upload release archive
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.archive }}
+          generate_release_notes: true
+
+  update-homebrew-tap:
+    needs: release-macos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets > release-assets.json
+      - name: Build Homebrew metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p downloads
+          node <<'NODE'
+          const fs = require('fs');
+          const { execFileSync } = require('child_process');
+          const data = JSON.parse(fs.readFileSync('release-assets.json', 'utf8'));
+          const wanted = {
+            'ipx-aarch64-apple-darwin.tar.gz': 'arm64',
+            'ipx-x86_64-apple-darwin.tar.gz': 'intel'
+          };
+          const out = {};
+          for (const asset of data.assets || []) {
+            const slot = wanted[asset.name];
+            if (!slot) continue;
+            execFileSync('gh', ['release', 'download', process.env.GITHUB_REF_NAME, '--repo', process.env.GITHUB_REPOSITORY, '--pattern', asset.name, '--dir', 'downloads'], { stdio: 'inherit' });
+            const sha256 = execFileSync('sha256sum', [`downloads/${asset.name}`], { encoding: 'utf8' }).trim().split(/\s+/)[0];
+            out[slot] = { name: asset.name, sha256 };
+          }
+          fs.writeFileSync('brew-meta.json', JSON.stringify(out, null, 2));
+          NODE
+      - name: Clone tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          test -n "$HOMEBREW_TAP_TOKEN"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tonyassistant/homebrew-tap.git" tap
+      - name: Write formula
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const meta = JSON.parse(fs.readFileSync('brew-meta.json', 'utf8'));
+          if (!meta.arm64 || !meta.intel) throw new Error('missing release artifacts for both macOS targets');
+          const tag = process.env.GITHUB_REF_NAME;
+          const version = tag.replace(/^v/, '');
+          const formula = [
+            'class Ipx < Formula',
+            '  desc "Keyboard-first macOS network operations TUI"',
+            '  homepage "https://github.com/tonyassistant/ipx"',
+            `  version "${version}"`,
+            '',
+            '  on_macos do',
+            '    if Hardware::CPU.arm?',
+            `      url "https://github.com/tonyassistant/ipx/releases/download/${tag}/${meta.arm64.name}"`,
+            `      sha256 "${meta.arm64.sha256}"`,
+            '    else',
+            `      url "https://github.com/tonyassistant/ipx/releases/download/${tag}/${meta.intel.name}"`,
+            `      sha256 "${meta.intel.sha256}"`,
+            '    end',
+            '  end',
+            '',
+            '  def install',
+            '    bin.install "ipx"',
+            '  end',
+            '',
+            '  test do',
+            '    system "#{bin}/ipx", "--help"',
+            '  end',
+            'end',
+            ''
+          ].join('\n');
+          fs.mkdirSync('tap/Formula', { recursive: true });
+          fs.writeFileSync('tap/Formula/ipx.rb', formula);
+          NODE
+      - name: Commit and push tap update
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/ipx.rb
+          git commit -m "ipx ${GITHUB_REF_NAME#v}" || exit 0
+          git push origin HEAD:main

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "linden",
+  "name": "ipx",
+  "colors": {
+    "primary": "#60A5FA",
+    "light": "#93C5FD",
+    "dark": "#2563EB"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "index",
+              "get-started/installation",
+              "get-started/quickstart"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/interface-list",
+              "features/inspector",
+              "features/actions",
+              "features/command-palette",
+              "features/event-log"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/discovery",
+              "reference/keybindings"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/tonyassistant/ipx",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/tonyassistant/ipx"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Repository",
+      "href": "https://github.com/tonyassistant/ipx"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/tonyassistant/ipx"
+    }
+  }
+}

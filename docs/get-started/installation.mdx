@@ -1,0 +1,48 @@
+---
+title: Installation
+description: Install ipx with Homebrew or build it locally.
+---
+
+# Installation
+
+## Install with Homebrew
+
+ipx is distributed through the `tonyassistant/homebrew-tap` tap.
+
+```bash
+brew tap tonyassistant/homebrew-tap
+brew install ipx
+```
+
+If you prefer a single command:
+
+```bash
+brew install tonyassistant/homebrew-tap/ipx
+```
+
+## Requirements for local development
+
+You need:
+
+- Rust toolchain
+- macOS for real interface discovery
+
+## Run ipx from source
+
+```bash
+cargo run
+```
+
+## Build a release binary
+
+```bash
+cargo build --release
+```
+
+## Validate your checkout
+
+```bash
+cargo fmt
+cargo test
+cargo build
+```
