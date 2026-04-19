@@ -65,6 +65,7 @@ pub struct App {
     pub status_line: String,
     pub action_selected: usize,
     pub pending_confirmation: Option<PendingConfirmation>,
+    pub palette_selected: usize,
 }
 
 impl App {
@@ -81,6 +82,7 @@ impl App {
             status_line: "Ready".to_string(),
             action_selected: 0,
             pending_confirmation: None,
+            palette_selected: 0,
         }
     }
 
@@ -150,15 +152,38 @@ impl App {
         ]
     }
 
+    pub fn filtered_palette_suggestions(&self) -> Vec<&'static str> {
+        let query = self.palette.trim().to_lowercase();
+        let mut ranked = self
+            .palette_suggestions()
+            .iter()
+            .copied()
+            .map(|command| (command, palette_match_rank(command, &query)))
+            .filter(|(_, rank)| rank.is_some())
+            .map(|(command, rank)| (command, rank.unwrap_or(u8::MAX)))
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|(left_command, left_rank), (right_command, right_rank)| {
+            left_rank
+                .cmp(right_rank)
+                .then_with(|| left_command.len().cmp(&right_command.len()))
+                .then_with(|| left_command.cmp(right_command))
+        });
+
+        ranked.into_iter().map(|(command, _)| command).collect()
+    }
+
     pub fn open_palette(&mut self) {
         self.focus = Focus::Palette;
         self.palette.clear();
+        self.palette_selected = 0;
         self.status_line = "Command palette".to_string();
     }
 
     pub fn dismiss_palette(&mut self) {
         self.focus = Focus::List;
         self.palette.clear();
+        self.palette_selected = 0;
         if self.pending_confirmation.is_none() {
             self.status_line = "Ready".to_string();
         }
@@ -167,6 +192,7 @@ impl App {
     pub fn complete_palette(&mut self) {
         self.focus = Focus::List;
         self.palette.clear();
+        self.palette_selected = 0;
     }
 
     pub fn next_tab(&mut self) {
@@ -287,8 +313,64 @@ impl App {
         }
     }
 
+    pub fn select_next_palette_suggestion(&mut self) {
+        let suggestions = self.filtered_palette_suggestions();
+        if suggestions.is_empty() {
+            self.palette_selected = 0;
+            return;
+        }
+
+        self.palette_selected = (self.palette_selected + 1) % suggestions.len();
+    }
+
+    pub fn select_previous_palette_suggestion(&mut self) {
+        let suggestions = self.filtered_palette_suggestions();
+        if suggestions.is_empty() {
+            self.palette_selected = 0;
+            return;
+        }
+
+        self.palette_selected = if self.palette_selected == 0 {
+            suggestions.len() - 1
+        } else {
+            self.palette_selected - 1
+        };
+    }
+
+    pub fn apply_selected_palette_suggestion(&mut self) -> bool {
+        let suggestions = self.filtered_palette_suggestions();
+        let Some(command) = suggestions.get(self.palette_selected) else {
+            return false;
+        };
+
+        self.palette = (*command).to_string();
+        true
+    }
+
+    pub fn update_palette_input(&mut self, palette: String) {
+        self.palette = palette;
+        let suggestions = self.filtered_palette_suggestions();
+        if suggestions.is_empty() {
+            self.palette_selected = 0;
+        } else if self.palette.trim().is_empty() {
+            self.palette_selected = self.palette_selected.min(suggestions.len() - 1);
+        } else {
+            self.palette_selected = 0;
+        }
+    }
+
     pub fn execute_palette(&mut self) {
-        let command = self.palette.trim().to_lowercase();
+        let used_suggestion = self.palette.trim().is_empty();
+        let command = if used_suggestion {
+            self.filtered_palette_suggestions()
+                .get(self.palette_selected)
+                .copied()
+                .unwrap_or("")
+                .to_string()
+        } else {
+            self.palette.trim().to_lowercase()
+        };
+
         if !command.is_empty() {
             self.palette_history.push(command.clone());
         }
@@ -312,10 +394,27 @@ impl App {
                 self.status_line = format!("Unknown command: {other}");
             }
         }
+
         self.complete_palette();
     }
 
     pub fn shortcuts(&self) -> &'static str {
         "j/k move • [/] details • a/s actions • enter run/confirm • esc cancel • p or : palette • q quit"
+    }
+}
+
+fn palette_match_rank(command: &str, query: &str) -> Option<u8> {
+    if query.is_empty() {
+        return Some(0);
+    }
+
+    if command == query {
+        Some(0)
+    } else if command.starts_with(query) {
+        Some(1)
+    } else if command.contains(query) {
+        Some(2)
+    } else {
+        None
     }
 }

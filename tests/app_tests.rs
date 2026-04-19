@@ -108,3 +108,54 @@ fn palette_suggestions_include_operator_commands() {
     assert!(app.palette_suggestions().contains(&"renew"));
     assert!(app.palette_suggestions().contains(&"quit"));
 }
+
+#[test]
+fn filtered_palette_suggestions_prefer_prefix_matches() {
+    let mut app = App::new(sample_interfaces());
+    app.update_palette_input("re".into());
+
+    assert_eq!(
+        app.filtered_palette_suggestions(),
+        vec!["renew", "reload", "refresh"]
+    );
+}
+
+#[test]
+fn palette_selection_wraps_through_filtered_results() {
+    let mut app = App::new(sample_interfaces());
+    app.update_palette_input("re".into());
+
+    app.select_next_palette_suggestion();
+    assert_eq!(app.palette_selected, 1);
+
+    app.select_next_palette_suggestion();
+    assert_eq!(app.palette_selected, 2);
+
+    app.select_next_palette_suggestion();
+    assert_eq!(app.palette_selected, 0);
+
+    app.select_previous_palette_suggestion();
+    assert_eq!(app.palette_selected, 2);
+}
+
+#[test]
+fn apply_selected_palette_suggestion_sets_palette_text() {
+    let mut app = App::new(sample_interfaces());
+    app.update_palette_input("re".into());
+    app.select_next_palette_suggestion();
+
+    assert!(app.apply_selected_palette_suggestion());
+    assert_eq!(app.palette, "reload");
+}
+
+#[test]
+fn executing_empty_palette_without_query_keeps_palette_status() {
+    let mut app = App::new(sample_interfaces());
+    app.open_palette();
+    app.select_next_palette_suggestion();
+    app.select_next_palette_suggestion();
+    app.execute_palette();
+
+    assert_eq!(app.focus, Focus::List);
+    assert_eq!(app.status_line, "Command palette");
+}

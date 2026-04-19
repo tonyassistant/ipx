@@ -75,10 +75,23 @@ fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App
                         Focus::Palette => match key.code {
                             KeyCode::Esc => app.dismiss_palette(),
                             KeyCode::Enter => app.execute_palette(),
-                            KeyCode::Backspace => {
-                                app.palette.pop();
+                            KeyCode::Tab | KeyCode::Down => app.select_next_palette_suggestion(),
+                            KeyCode::BackTab | KeyCode::Up => {
+                                app.select_previous_palette_suggestion()
                             }
-                            KeyCode::Char(c) => app.palette.push(c),
+                            KeyCode::Right => {
+                                let _ = app.apply_selected_palette_suggestion();
+                            }
+                            KeyCode::Backspace => {
+                                let mut next = app.palette.clone();
+                                next.pop();
+                                app.update_palette_input(next);
+                            }
+                            KeyCode::Char(c) => {
+                                let mut next = app.palette.clone();
+                                next.push(c);
+                                app.update_palette_input(next);
+                            }
                             _ => {}
                         },
                     }
@@ -294,31 +307,39 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect) {
     let hint = Paragraph::new("enter run • esc cancel").style(Style::default().fg(OPERATOR_MUTED));
     frame.render_widget(hint, sections[1]);
 
-    let suggestions = app
-        .palette_suggestions()
-        .iter()
-        .map(|command| {
-            let active = !app.palette.is_empty() && command.starts_with(app.palette.as_str());
-            Line::from(vec![
-                Span::styled(
-                    if active { "▶" } else { "•" },
-                    Style::default().fg(if active { Color::Cyan } else { OPERATOR_MUTED }),
-                ),
-                " ".into(),
-                Span::styled(
-                    *command,
-                    Style::default()
-                        .fg(if active { Color::White } else { OPERATOR_MUTED })
-                        .add_modifier(if active {
-                            Modifier::BOLD
-                        } else {
-                            Modifier::empty()
-                        }),
-                ),
-            ])
-        })
-        .collect::<Vec<_>>();
-    frame.render_widget(Paragraph::new(suggestions), sections[2]);
+    let suggestions = app.filtered_palette_suggestions();
+    let suggestion_lines = if suggestions.is_empty() {
+        vec![Line::from(Span::styled(
+            "No matching commands",
+            Style::default().fg(OPERATOR_MUTED),
+        ))]
+    } else {
+        suggestions
+            .iter()
+            .enumerate()
+            .map(|(idx, command)| {
+                let active = idx == app.palette_selected;
+                Line::from(vec![
+                    Span::styled(
+                        if active { "▶" } else { "•" },
+                        Style::default().fg(if active { Color::Cyan } else { OPERATOR_MUTED }),
+                    ),
+                    " ".into(),
+                    Span::styled(
+                        *command,
+                        Style::default()
+                            .fg(if active { Color::White } else { OPERATOR_MUTED })
+                            .add_modifier(if active {
+                                Modifier::BOLD
+                            } else {
+                                Modifier::empty()
+                            }),
+                    ),
+                ])
+            })
+            .collect::<Vec<_>>()
+    };
+    frame.render_widget(Paragraph::new(suggestion_lines), sections[2]);
 }
 
 fn interface_row(iface: &NetworkInterface, selected: bool) -> Line<'static> {
