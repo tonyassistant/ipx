@@ -580,13 +580,49 @@ fn palette_match_rank(command: &str, query: &str) -> Option<u8> {
         return Some(0);
     }
 
+    let query_tokens = tokenize_command(query);
+    let command_tokens = tokenize_command(command);
+    let compact_query = query.replace([' ', '-', '_'], "").to_lowercase();
+    let initialism = command_tokens
+        .iter()
+        .filter_map(|token| token.chars().next())
+        .collect::<String>();
+
     if command == query {
         Some(0)
     } else if command.starts_with(query) {
         Some(1)
-    } else if command.contains(query) {
+    } else if command_tokens == query_tokens {
         Some(2)
+    } else if tokens_match_by_prefix(&query_tokens, &command_tokens) {
+        Some(3)
+    } else if !compact_query.is_empty() && initialism.starts_with(&compact_query) {
+        Some(4)
+    } else if command.contains(query) {
+        Some(5)
     } else {
         None
     }
+}
+
+fn tokenize_command(value: &str) -> Vec<&str> {
+    value
+        .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+        .filter(|token| !token.is_empty())
+        .collect()
+}
+
+fn tokens_match_by_prefix(query_tokens: &[&str], command_tokens: &[&str]) -> bool {
+    if query_tokens.is_empty() {
+        return true;
+    }
+
+    if query_tokens.len() > command_tokens.len() {
+        return false;
+    }
+
+    query_tokens
+        .iter()
+        .zip(command_tokens.iter())
+        .all(|(query, command)| command.starts_with(query))
 }

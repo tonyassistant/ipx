@@ -172,6 +172,28 @@ fn filtered_palette_suggestions_prefer_prefix_matches() {
 }
 
 #[test]
+fn filtered_palette_suggestions_support_token_prefix_matching() {
+    let mut app = App::new(sample_interfaces());
+    app.update_palette_input("gi".into());
+
+    assert_eq!(app.filtered_palette_suggestions(), vec!["group inactive"]);
+
+    app.update_palette_input("sh in".into());
+    assert_eq!(app.filtered_palette_suggestions(), vec!["show inactive"]);
+}
+
+#[test]
+fn palette_executes_token_matched_command_after_completion() {
+    let mut app = App::new(sample_interfaces());
+    app.open_palette();
+    app.update_palette_input("gi".into());
+    assert!(app.apply_selected_palette_suggestion());
+    app.execute_palette();
+
+    assert_eq!(app.interface_visibility, InterfaceVisibility::GroupInactive);
+}
+
+#[test]
 fn palette_can_switch_visibility_modes() {
     let mut app = App::new(sample_interfaces());
     app.open_palette();

@@ -55,7 +55,7 @@ The current TUI flow is:
 - `v` cycles interface visibility between all, grouped inactive, active, and inactive
 - `[` / `]` or `Shift+Tab` / `Tab` switch inspector views
 - `a` / `s` move through actions in the Actions view
-- `p` or `:` opens the command palette
+- `p` or `:` opens the command palette, with forgiving suggestion matching for abbreviated commands
 - `Enter` runs an action or confirms a gated action
 - `Esc` cancels an open confirmation or closes the palette
 
