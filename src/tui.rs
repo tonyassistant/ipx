@@ -553,7 +553,7 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
         section_line("Next parser pass"),
         bullet_line("RSSI and noise floor for Wi-Fi surfaces".to_string()),
         bullet_line("Negotiated speed and duplex for wired links".to_string()),
-        bullet_line("Active probe-backed reachability validation after route modeling".to_string()),
+        bullet_line("Probe-backed validation for private-route and upstream certainty".to_string()),
     ]
 }
 
@@ -667,6 +667,7 @@ fn status_style(status: &InterfaceStatus) -> Style {
 fn reachability_style(state: ReachabilityState) -> Style {
     match state {
         ReachabilityState::Reachable => Style::default().fg(Color::Green),
+        ReachabilityState::PrivateRoute => Style::default().fg(Color::Yellow),
         ReachabilityState::LocalOnly => Style::default().fg(OPERATOR_AMBER),
         ReachabilityState::Down | ReachabilityState::Unknown => Style::default().fg(OPERATOR_MUTED),
     }

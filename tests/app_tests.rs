@@ -323,7 +323,7 @@ fn cancelling_confirmation_sets_feedback() {
 fn sample_interfaces_expose_expected_reachability_states() {
     let interfaces = sample_interfaces();
 
-    assert_eq!(interfaces[0].reachability(), ReachabilityState::LocalOnly);
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::PrivateRoute);
     assert_eq!(interfaces[1].reachability(), ReachabilityState::Down);
     assert_eq!(interfaces[2].reachability(), ReachabilityState::Unknown);
 }

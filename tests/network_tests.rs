@@ -117,7 +117,7 @@ default            192.168.1.1        UGScg                 en0
     assert_eq!(wifi.ipv4.as_deref(), Some("192.168.1.20"));
     assert_eq!(wifi.services.len(), 2);
     assert_eq!(wifi.gateway.as_deref(), Some("192.168.1.1"));
-    assert_eq!(wifi.reachability(), ReachabilityState::LocalOnly);
+    assert_eq!(wifi.reachability(), ReachabilityState::PrivateRoute);
     assert_eq!(wifi.services[0].name, "Wi-Fi");
     assert_eq!(wifi.services[0].status, NetworkServiceStatus::Enabled);
     assert_eq!(wifi.services[1].name, "Wi-Fi Diagnostics");
@@ -205,6 +205,7 @@ default via 10.0.0.1 dev wlan0 proto dhcp src 10.0.0.8 metric 600
     assert_eq!(default_route.gateway, "192.168.1.1");
     assert_eq!(default_route.metric, Some(100));
     assert_eq!(default_route.source.as_deref(), Some("192.168.1.50"));
+    assert_eq!(eth0.reachability(), ReachabilityState::PrivateRoute);
 
     let docker0 = interfaces
         .iter()

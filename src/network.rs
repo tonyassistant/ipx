@@ -122,6 +122,7 @@ pub struct NetworkInterface {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReachabilityState {
     Reachable,
+    PrivateRoute,
     LocalOnly,
     Down,
     Unknown,
@@ -131,6 +132,7 @@ impl ReachabilityState {
     pub fn label(&self) -> &'static str {
         match self {
             Self::Reachable => "reachable",
+            Self::PrivateRoute => "private route",
             Self::LocalOnly => "local only",
             Self::Down => "down",
             Self::Unknown => "unknown",
@@ -140,6 +142,7 @@ impl ReachabilityState {
     pub fn note(&self) -> &'static str {
         match self {
             Self::Reachable => "Internet path appears available",
+            Self::PrivateRoute => "Default route is present on a private upstream path",
             Self::LocalOnly => "Interface has a local address but no verified upstream path",
             Self::Down => "No active path detected for this interface",
             Self::Unknown => "Reachability has not been evaluated yet",
@@ -150,27 +153,26 @@ impl ReachabilityState {
 impl NetworkInterface {
     pub fn reachability(&self) -> ReachabilityState {
         match self.status {
-            InterfaceStatus::Connected => {
-                if self.has_verified_upstream_path() {
-                    ReachabilityState::Reachable
-                } else if self.ipv4.is_some() {
-                    ReachabilityState::LocalOnly
-                } else {
-                    ReachabilityState::LocalOnly
+            InterfaceStatus::Connected => match (self.ipv4.as_deref(), self.gateway.as_deref()) {
+                (Some(ip), Some(gateway)) => {
+                    if is_globally_routable_ipv4(ip) && is_globally_routable_ipv4(gateway) {
+                        ReachabilityState::Reachable
+                    } else {
+                        ReachabilityState::PrivateRoute
+                    }
                 }
-            }
+                (Some(ip), None) => {
+                    if is_globally_routable_ipv4(ip) {
+                        ReachabilityState::Reachable
+                    } else {
+                        ReachabilityState::LocalOnly
+                    }
+                }
+                (None, Some(_)) => ReachabilityState::PrivateRoute,
+                (None, None) => ReachabilityState::LocalOnly,
+            },
             InterfaceStatus::Disconnected => ReachabilityState::Down,
             InterfaceStatus::Inactive => ReachabilityState::Unknown,
-        }
-    }
-
-    fn has_verified_upstream_path(&self) -> bool {
-        match (self.ipv4.as_deref(), self.gateway.as_deref()) {
-            (Some(ip), Some(gateway)) => {
-                !is_private_or_special_ipv4(gateway) && !is_private_or_special_ipv4(ip)
-            }
-            (Some(ip), None) => is_globally_routable_ipv4(ip),
-            _ => false,
         }
     }
 
