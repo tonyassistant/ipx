@@ -1,6 +1,4 @@
-use ipx::network::{
-    build_interfaces_from_linux_outputs, sample_interfaces,
-};
+use ipx::network::{build_interfaces_from_linux_outputs, sample_interfaces};
 
 fn render_overview_lines() -> String {
     let interfaces = sample_interfaces();
@@ -40,7 +38,10 @@ fn linux_interfaces_expose_platform_service_mapping_note() {
         "default via 192.168.1.1 dev eth0 proto dhcp src 192.168.1.50 metric 100",
     );
 
-    let eth0 = interfaces.iter().find(|iface| iface.device == "eth0").unwrap();
+    let eth0 = interfaces
+        .iter()
+        .find(|iface| iface.device == "eth0")
+        .unwrap();
     assert!(eth0
         .origin
         .service_mapping_note()
