@@ -251,6 +251,7 @@ impl App {
 
     pub fn palette_suggestions(&self) -> &'static [&'static str] {
         &[
+            "copy",
             "refresh",
             "reload",
             "show all",
@@ -258,7 +259,6 @@ impl App {
             "show active",
             "show inactive",
             "help",
-            "copy",
             "inspect",
             "renew",
             "quit",
