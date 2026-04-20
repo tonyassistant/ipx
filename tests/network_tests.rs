@@ -164,6 +164,13 @@ fn sample_interfaces_include_service_model() {
 }
 
 #[test]
+fn default_route_presence_marks_primary_uplink_role() {
+    let interfaces = sample_interfaces();
+    assert!(interfaces[0].carries_default_route());
+    assert!(!interfaces[1].carries_default_route());
+}
+
+#[test]
 fn parses_linux_ip_link_output() {
     let input = r#"
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN mode DEFAULT group default

@@ -492,6 +492,11 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
         .or_else(|| iface.services.first())
         .map(|service| service.name.clone())
         .unwrap_or_else(|| "-".to_string());
+    let route_role = if iface.carries_default_route() {
+        "primary uplink"
+    } else {
+        "secondary or local"
+    };
 
     let mut lines = vec![
         kv_line("Name", iface.name.clone()),
@@ -515,6 +520,7 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
                 .map(|route| route.summary())
                 .unwrap_or_else(|| "-".to_string()),
         ),
+        kv_line("Role", route_role.to_string()),
         kv_line("Service", primary_service),
         kv_line("MAC", iface.mac.clone().unwrap_or_else(|| "-".to_string())),
         Line::from(""),
@@ -802,6 +808,7 @@ mod tests {
             .join("\n");
 
         assert!(rendered.contains("Route 192.168.1.1 • src 192.168.1.24"));
+        assert!(rendered.contains("Role primary uplink"));
         assert!(rendered.contains("Service Wi-Fi"));
     }
 }

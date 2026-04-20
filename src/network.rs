@@ -151,6 +151,10 @@ impl ReachabilityState {
 }
 
 impl NetworkInterface {
+    pub fn carries_default_route(&self) -> bool {
+        self.default_route.is_some()
+    }
+
     pub fn reachability(&self) -> ReachabilityState {
         match self.status {
             InterfaceStatus::Connected => match (self.ipv4.as_deref(), self.gateway.as_deref()) {
