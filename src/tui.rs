@@ -76,7 +76,12 @@ fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App
                         Focus::Palette => match key.code {
                             KeyCode::Esc => app.dismiss_palette(),
                             KeyCode::Enter => app.execute_palette(),
-                            KeyCode::Tab | KeyCode::Down => app.select_next_palette_suggestion(),
+                            KeyCode::Tab => {
+                                if !app.apply_selected_palette_suggestion() {
+                                    app.select_next_palette_suggestion();
+                                }
+                            }
+                            KeyCode::Down => app.select_next_palette_suggestion(),
                             KeyCode::BackTab | KeyCode::Up => {
                                 app.select_previous_palette_suggestion()
                             }

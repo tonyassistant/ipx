@@ -211,6 +211,14 @@ fn apply_selected_palette_suggestion_sets_palette_text() {
 }
 
 #[test]
+fn applying_selected_palette_suggestion_without_query_uses_default_command() {
+    let mut app = App::new(sample_interfaces());
+
+    assert!(app.apply_selected_palette_suggestion());
+    assert_eq!(app.palette, "copy");
+}
+
+#[test]
 fn executing_empty_palette_without_query_keeps_palette_status() {
     let mut app = App::new(sample_interfaces());
     app.open_palette();
