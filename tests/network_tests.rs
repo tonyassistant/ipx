@@ -1,5 +1,6 @@
 use ipx::network::{
-    build_interfaces_from_macos_outputs, parse_networksetup_hardwareports,
+    build_interfaces_from_linux_outputs, build_interfaces_from_macos_outputs,
+    build_interfaces_from_windows_ipconfig, parse_linux_ip_link, parse_networksetup_hardwareports,
     parse_networksetup_service_order, sample_interfaces, InterfaceKind, InterfaceStatus,
     NetworkServiceStatus, ReachabilityState,
 };
@@ -160,4 +161,78 @@ fn sample_interfaces_include_service_model() {
         .detail_lines()
         .iter()
         .any(|line| line.contains("Services: 1")));
+}
+
+#[test]
+fn parses_linux_ip_link_output() {
+    let input = r#"
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN mode DEFAULT group default
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP mode DEFAULT group default link/ether 52:54:00:12:34:56
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN mode DEFAULT group default link/ether 02:42:aa:bb:cc:dd
+"#;
+
+    let interfaces = parse_linux_ip_link(input);
+    assert_eq!(interfaces.len(), 3);
+    assert_eq!(interfaces[1].device, "eth0");
+    assert_eq!(interfaces[1].kind, InterfaceKind::Ethernet);
+    assert_eq!(interfaces[1].status, InterfaceStatus::Connected);
+    assert_eq!(interfaces[2].kind, InterfaceKind::Virtual);
+}
+
+#[test]
+fn builds_linux_interfaces_with_addresses_and_gateway() {
+    let link = r#"
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP mode DEFAULT group default link/ether 52:54:00:12:34:56
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN mode DEFAULT group default link/ether 02:42:aa:bb:cc:dd
+"#;
+    let addr = r#"
+2: eth0    inet 192.168.1.50/24 brd 192.168.1.255 scope global dynamic eth0
+3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+"#;
+    let route = r#"
+default via 192.168.1.1 dev eth0 proto dhcp src 192.168.1.50 metric 100
+"#;
+
+    let interfaces = build_interfaces_from_linux_outputs(link, addr, route);
+    let eth0 = interfaces
+        .iter()
+        .find(|iface| iface.device == "eth0")
+        .unwrap();
+    assert_eq!(eth0.ipv4.as_deref(), Some("192.168.1.50"));
+    assert_eq!(eth0.gateway.as_deref(), Some("192.168.1.1"));
+
+    let docker0 = interfaces
+        .iter()
+        .find(|iface| iface.device == "docker0")
+        .unwrap();
+    assert_eq!(docker0.kind, InterfaceKind::Virtual);
+}
+
+#[test]
+fn builds_windows_interfaces_from_ipconfig() {
+    let input = r#"
+Windows IP Configuration
+
+Ethernet adapter Ethernet:
+   Connection-specific DNS Suffix  . :
+   Description . . . . . . . . . . . : Intel(R) Ethernet Connection
+   Physical Address. . . . . . . . . : AA-BB-CC-DD-EE-FF
+   DHCP Enabled. . . . . . . . . . . : Yes
+   IPv4 Address. . . . . . . . . . . : 10.0.0.25(Preferred)
+   Default Gateway . . . . . . . . . : 10.0.0.1
+
+Ethernet adapter vEthernet (WSL):
+   Connection-specific DNS Suffix  . :
+   Description . . . . . . . . . . . : Hyper-V Virtual Ethernet Adapter
+   Physical Address. . . . . . . . . : 11-22-33-44-55-66
+   Media State . . . . . . . . . . . : Media disconnected
+"#;
+
+    let interfaces = build_interfaces_from_windows_ipconfig(input);
+    assert_eq!(interfaces.len(), 2);
+    assert_eq!(interfaces[0].kind, InterfaceKind::Ethernet);
+    assert_eq!(interfaces[0].ipv4.as_deref(), Some("10.0.0.25"));
+    assert_eq!(interfaces[0].gateway.as_deref(), Some("10.0.0.1"));
+    assert_eq!(interfaces[1].kind, InterfaceKind::Virtual);
+    assert_eq!(interfaces[1].status, InterfaceStatus::Disconnected);
 }

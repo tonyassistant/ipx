@@ -10,6 +10,7 @@ Current foundations in the repo:
 - Rust application structure
 - modular TUI architecture
 - macOS-oriented interface discovery with fallback sample data
+- initial Linux and Windows discovery scaffolding
 - command palette shell
 - safe v1 action framework with confirmation gates for risky network operations
 - event log and inspector layout
@@ -83,6 +84,7 @@ For v1, ipx should:
 - make risky actions explicit
 - feel calm and operator-grade
 - support a polished macOS-native workflow for network inspection
+- provide honest, useful discovery support on Linux and Windows while parity improves
 
 The Actions tab now exposes a small safe-action catalog:
 - read-only actions execute immediately

@@ -189,14 +189,22 @@ impl NetworkInterface {
 }
 
 pub fn load_interfaces() -> Vec<NetworkInterface> {
-    discover_macos_interfaces().unwrap_or_else(sample_interfaces)
+    discover_interfaces().unwrap_or_else(sample_interfaces)
+}
+
+fn discover_interfaces() -> Option<Vec<NetworkInterface>> {
+    if cfg!(target_os = "macos") {
+        discover_macos_interfaces()
+    } else if cfg!(target_os = "linux") {
+        discover_linux_interfaces()
+    } else if cfg!(target_os = "windows") {
+        discover_windows_interfaces()
+    } else {
+        None
+    }
 }
 
 fn discover_macos_interfaces() -> Option<Vec<NetworkInterface>> {
-    if !cfg!(target_os = "macos") {
-        return None;
-    }
-
     let hardware_text = run_command("networksetup", &["-listallhardwareports"])?;
     let service_order_text =
         run_command("networksetup", &["-listnetworkserviceorder"]).unwrap_or_default();
@@ -209,6 +217,29 @@ fn discover_macos_interfaces() -> Option<Vec<NetworkInterface>> {
         &ifconfig_text,
         &routes_text,
     );
+    if interfaces.is_empty() {
+        return None;
+    }
+
+    Some(interfaces)
+}
+
+fn discover_linux_interfaces() -> Option<Vec<NetworkInterface>> {
+    let link_text = run_command("ip", &["-o", "link", "show"])?;
+    let addr_text = run_command("ip", &["-o", "-4", "addr", "show"]).unwrap_or_default();
+    let route_text = run_command("ip", &["route", "show", "default"]).unwrap_or_default();
+
+    let interfaces = build_interfaces_from_linux_outputs(&link_text, &addr_text, &route_text);
+    if interfaces.is_empty() {
+        return None;
+    }
+
+    Some(interfaces)
+}
+
+fn discover_windows_interfaces() -> Option<Vec<NetworkInterface>> {
+    let config_text = run_command("ipconfig", &["/all"])?;
+    let interfaces = build_interfaces_from_windows_ipconfig(&config_text);
     if interfaces.is_empty() {
         return None;
     }
@@ -484,15 +515,14 @@ fn finalize_interface_notes(iface: &mut NetworkInterface) {
 
 fn classify_kind(name: &str, device: &str) -> InterfaceKind {
     let l = format!("{} {}", name.to_lowercase(), device.to_lowercase());
-    if l.contains("wi-fi") || l.contains("airport") || l.contains("wireless") {
+    if l.contains("wi-fi") || l.contains("wifi") || l.contains("airport") || l.contains("wireless") || l.contains("wlan") {
         InterfaceKind::Wireless
     } else if l.contains("bridge") {
         InterfaceKind::Bridge
+    } else if is_likely_virtual(&l) {
+        InterfaceKind::Virtual
     } else if is_likely_ethernet(&l) {
         InterfaceKind::Ethernet
-    } else if l.contains("utun") || l.contains("awdl") || l.contains("llw") || l.contains("virtual")
-    {
-        InterfaceKind::Virtual
     } else {
         InterfaceKind::Unknown
     }
@@ -506,6 +536,23 @@ fn is_likely_ethernet(value: &str) -> bool {
         || value.contains("gigabit")
         || value.contains("10/100")
         || value.contains("10gbe")
+        || value.contains("eth")
+        || value.contains("enp")
+}
+
+fn is_likely_virtual(value: &str) -> bool {
+    value.contains("utun")
+        || value.contains("awdl")
+        || value.contains("llw")
+        || value.contains("virtual")
+        || value.contains("docker")
+        || value.contains("veth")
+        || value.contains("vethernet")
+        || value.contains("wsl")
+        || value.contains("hyper-v")
+        || value.contains("tun")
+        || value.contains("tap")
+        || value.contains("vmnet")
 }
 
 fn parse_default_gateway(routes_text: &str, device: &str) -> Option<String> {
@@ -535,6 +582,211 @@ fn parse_default_gateway(routes_text: &str, device: &str) -> Option<String> {
     }
 
     None
+}
+
+pub fn build_interfaces_from_linux_outputs(
+    link_text: &str,
+    addr_text: &str,
+    route_text: &str,
+) -> Vec<NetworkInterface> {
+    let mut interfaces = parse_linux_ip_link(link_text);
+
+    for iface in &mut interfaces {
+        enrich_from_linux_ip_addr(iface, addr_text);
+        iface.gateway = parse_linux_default_gateway(route_text, &iface.device);
+        finalize_interface_notes(iface);
+    }
+
+    interfaces
+}
+
+pub fn parse_linux_ip_link(input: &str) -> Vec<NetworkInterface> {
+    let mut interfaces = Vec::new();
+
+    for line in input.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let Some((_, remainder)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let remainder = remainder.trim();
+        let Some((device_part, details_part)) = remainder.split_once(':') else {
+            continue;
+        };
+
+        let device = device_part.trim().trim_end_matches('@').to_string();
+        let lower = details_part.to_lowercase();
+        let status = if lower.contains("state up") {
+            InterfaceStatus::Connected
+        } else if lower.contains("state down") {
+            InterfaceStatus::Disconnected
+        } else {
+            InterfaceStatus::Inactive
+        };
+
+        interfaces.push(NetworkInterface {
+            name: device.clone(),
+            device: device.clone(),
+            kind: classify_kind(&device, &device),
+            status,
+            ipv4: None,
+            mac: parse_linux_mac(details_part),
+            gateway: None,
+            services: Vec::new(),
+            notes: vec!["Imported from ip link show".to_string()],
+        });
+    }
+
+    interfaces
+}
+
+fn parse_linux_mac(details: &str) -> Option<String> {
+    let columns = details.split_whitespace().collect::<Vec<_>>();
+    columns
+        .windows(2)
+        .find(|window| window[0] == "link/ether")
+        .map(|window| window[1].to_string())
+}
+
+fn enrich_from_linux_ip_addr(iface: &mut NetworkInterface, addr_text: &str) {
+    for line in addr_text.lines() {
+        let trimmed = line.trim();
+        if !trimmed.contains(&format!(" {} ", iface.device))
+            && !trimmed.ends_with(&format!(" {}", iface.device))
+        {
+            continue;
+        }
+
+        let columns = trimmed.split_whitespace().collect::<Vec<_>>();
+        if let Some(inet_idx) = columns.iter().position(|column| *column == "inet") {
+            if let Some(value) = columns.get(inet_idx + 1) {
+                iface.ipv4 = value.split('/').next().map(str::to_string);
+                if iface.status == InterfaceStatus::Disconnected {
+                    iface.status = InterfaceStatus::Connected;
+                }
+            }
+        }
+    }
+}
+
+fn parse_linux_default_gateway(route_text: &str, device: &str) -> Option<String> {
+    for line in route_text.lines() {
+        let columns = line.split_whitespace().collect::<Vec<_>>();
+        if columns.len() < 5 || columns.first().copied() != Some("default") {
+            continue;
+        }
+
+        let via = columns
+            .windows(2)
+            .find(|window| window[0] == "via")?
+            .get(1)?;
+        let dev = columns
+            .windows(2)
+            .find(|window| window[0] == "dev")?
+            .get(1)?;
+        if *dev == device {
+            return Some((*via).to_string());
+        }
+    }
+
+    None
+}
+
+pub fn build_interfaces_from_windows_ipconfig(input: &str) -> Vec<NetworkInterface> {
+    let mut interfaces = Vec::new();
+    let mut current_name: Option<String> = None;
+    let mut current = empty_windows_interface();
+
+    for line in input.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if !line.starts_with(' ') && trimmed.ends_with(':') {
+            if let Some(name) = current_name.take() {
+                finalize_windows_interface(&mut current);
+                current.name = name.clone();
+                if current.device.is_empty() {
+                    current.device = sanitize_windows_device_name(&name);
+                }
+                interfaces.push(current.clone());
+                current = empty_windows_interface();
+            }
+
+            let name = trimmed.trim_end_matches(':').to_string();
+            if name.contains("adapter") {
+                current_name = Some(name.clone());
+                current.name = name;
+            }
+            continue;
+        }
+
+        let Some((key, value)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let value = value.trim().to_string();
+        let key = key.trim().to_lowercase();
+
+        match key.as_str() {
+            k if k.contains("physical address") => current.mac = Some(value),
+            k if k.contains("ipv4 address") => {
+                current.ipv4 = Some(value.trim_end_matches("(Preferred)").trim().to_string())
+            }
+            k if k.contains("default gateway") && !value.is_empty() => {
+                current.gateway = Some(value)
+            }
+            k if k.contains("media state") => {
+                current.status = if value.to_lowercase().contains("disconnected") {
+                    InterfaceStatus::Disconnected
+                } else {
+                    InterfaceStatus::Connected
+                }
+            }
+            k if k.contains("description") => current.notes.push(format!("Description: {value}")),
+            _ => {}
+        }
+    }
+
+    if let Some(name) = current_name {
+        finalize_windows_interface(&mut current);
+        current.name = name.clone();
+        if current.device.is_empty() {
+            current.device = sanitize_windows_device_name(&name);
+        }
+        interfaces.push(current);
+    }
+
+    interfaces
+}
+
+fn empty_windows_interface() -> NetworkInterface {
+    NetworkInterface {
+        name: String::new(),
+        device: String::new(),
+        kind: InterfaceKind::Unknown,
+        status: InterfaceStatus::Inactive,
+        ipv4: None,
+        mac: None,
+        gateway: None,
+        services: Vec::new(),
+        notes: vec!["Imported from ipconfig /all".to_string()],
+    }
+}
+
+fn finalize_windows_interface(iface: &mut NetworkInterface) {
+    iface.kind = classify_kind(&iface.name, &iface.device);
+    if iface.ipv4.is_some() && iface.status == InterfaceStatus::Inactive {
+        iface.status = InterfaceStatus::Connected;
+    }
+    finalize_interface_notes(iface);
+}
+
+fn sanitize_windows_device_name(name: &str) -> String {
+    name.to_lowercase().replace(' ', "-")
 }
 
 fn is_globally_routable_ipv4(ip: &str) -> bool {
