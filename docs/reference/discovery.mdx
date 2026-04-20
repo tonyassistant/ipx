@@ -1,26 +1,47 @@
 ---
 title: Network discovery
-description: How ipx understands the local macOS network surface.
+description: How ipx understands the local network surface across platforms.
 ---
 
 # Network discovery
 
-On macOS, ipx builds its view from system networking commands.
+ipx builds its view from native operating-system networking commands.
 
 ## Current discovery sources
+
+### macOS
 
 - `networksetup -listallhardwareports`
 - `networksetup -listnetworkserviceorder`
 - `ifconfig`
+- `netstat -rn -f inet`
+
+### Linux
+
+- `ip -o link show`
+- `ip -o -4 addr show`
+- `ip route show default`
+
+### Windows
+
+- `ipconfig /all`
 
 ## What this enables
 
 ipx can currently map:
 
-- hardware ports to devices
-- services to interfaces
+- interfaces and devices
 - basic addressing and status information
+- default gateway context
+- virtual interfaces on supported platforms
+- service-to-interface mapping where the platform exposes it clearly
+
+## Platform notes
+
+- macOS currently has the richest service mapping
+- Linux currently focuses on interface, address, gateway, and virtual-interface discovery
+- Windows currently focuses on interface, address, gateway, and adapter classification
 
 ## v1 expectation
 
-This is enough for a strong inspect-first v1, while deeper signal and service-state fidelity can continue to improve over time.
+This is enough for a strong inspect-first v1, while deeper signal, service-state, and platform-parity work continues over time.
