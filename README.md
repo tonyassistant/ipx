@@ -11,6 +11,7 @@ Current foundations in the repo:
 - modular TUI architecture
 - macOS-oriented interface discovery with fallback sample data
 - initial Linux and Windows discovery scaffolding, now including Linux default-route metric and source visibility
+- honest upstream posture labeling that separates configured upstream path from probe-verified reachability
 - command palette shell
 - safe v1 action framework with confirmation gates for risky network operations
 - event log and inspector layout

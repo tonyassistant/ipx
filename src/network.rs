@@ -150,7 +150,7 @@ pub struct NetworkInterface {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReachabilityState {
-    Reachable,
+    UpstreamConfigured,
     PrivateRoute,
     LinkLocalOnly,
     LocalOnly,
@@ -161,7 +161,7 @@ pub enum ReachabilityState {
 impl ReachabilityState {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Reachable => "reachable",
+            Self::UpstreamConfigured => "upstream configured",
             Self::PrivateRoute => "private route",
             Self::LinkLocalOnly => "link-local only",
             Self::LocalOnly => "local only",
@@ -172,7 +172,9 @@ impl ReachabilityState {
 
     pub fn note(&self) -> &'static str {
         match self {
-            Self::Reachable => "Internet path appears available",
+            Self::UpstreamConfigured => {
+                "Default route and non-local addressing are present, but upstream reachability is not yet probe-verified"
+            }
             Self::PrivateRoute => "Default route is present on a private upstream path",
             Self::LinkLocalOnly => "Interface only has a link-local address and no verified upstream path",
             Self::LocalOnly => "Interface has a local address but no verified upstream path",
@@ -192,14 +194,14 @@ impl NetworkInterface {
             InterfaceStatus::Connected => match (self.ipv4.as_deref(), self.gateway.as_deref()) {
                 (Some(ip), Some(gateway)) => {
                     if is_globally_routable_ipv4(ip) && is_globally_routable_ipv4(gateway) {
-                        ReachabilityState::Reachable
+                        ReachabilityState::UpstreamConfigured
                     } else {
                         ReachabilityState::PrivateRoute
                     }
                 }
                 (Some(ip), None) => {
                     if is_globally_routable_ipv4(ip) {
-                        ReachabilityState::Reachable
+                        ReachabilityState::UpstreamConfigured
                     } else if is_link_local_ipv4(ip) {
                         ReachabilityState::LinkLocalOnly
                     } else {

@@ -145,12 +145,15 @@ default            192.168.1.1        UGScg                 en0
 }
 
 #[test]
-fn globally_routed_ip_and_gateway_are_treated_as_reachable() {
+fn globally_routed_ip_and_gateway_are_treated_as_upstream_configured() {
     let mut interfaces = sample_interfaces();
     interfaces[0].ipv4 = Some("8.8.8.8".to_string());
     interfaces[0].gateway = Some("1.1.1.1".to_string());
 
-    assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
+    assert_eq!(
+        interfaces[0].reachability(),
+        ReachabilityState::UpstreamConfigured
+    );
 }
 
 #[test]
