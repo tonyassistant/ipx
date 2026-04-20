@@ -500,12 +500,16 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
             "Address {}",
             iface.ipv4.as_deref().unwrap_or("unassigned")
         )),
+        bullet_line(format!(
+            "Gateway {}",
+            iface.gateway.as_deref().unwrap_or("unassigned")
+        )),
         bullet_line(format!("Service bindings {}", iface.services.len())),
         Line::from(""),
         section_line("Next parser pass"),
         bullet_line("RSSI and noise floor for Wi-Fi surfaces".to_string()),
         bullet_line("Negotiated speed and duplex for wired links".to_string()),
-        bullet_line("Active probe-backed reachability validation".to_string()),
+        bullet_line("Active probe-backed reachability validation after route modeling".to_string()),
     ]
 }
 

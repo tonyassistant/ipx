@@ -1,7 +1,7 @@
 use ipx::network::{
     build_interfaces_from_macos_outputs, parse_networksetup_hardwareports,
     parse_networksetup_service_order, sample_interfaces, InterfaceKind, InterfaceStatus,
-    NetworkServiceStatus,
+    NetworkServiceStatus, ReachabilityState,
 };
 
 #[test]
@@ -100,7 +100,12 @@ en3: flags=8822<BROADCAST,SMART,SIMPLEX,MULTICAST> mtu 1500
     status: inactive
 "#;
 
-    let interfaces = build_interfaces_from_macos_outputs(hardware, service_order, ifconfig);
+    let routes = r#"
+Internet:
+default            192.168.1.1        UGScg                 en0
+"#;
+
+    let interfaces = build_interfaces_from_macos_outputs(hardware, service_order, ifconfig, routes);
     assert_eq!(interfaces.len(), 2);
 
     let wifi = interfaces
@@ -110,6 +115,8 @@ en3: flags=8822<BROADCAST,SMART,SIMPLEX,MULTICAST> mtu 1500
     assert_eq!(wifi.status, InterfaceStatus::Connected);
     assert_eq!(wifi.ipv4.as_deref(), Some("192.168.1.20"));
     assert_eq!(wifi.services.len(), 2);
+    assert_eq!(wifi.gateway.as_deref(), Some("192.168.1.1"));
+    assert_eq!(wifi.reachability(), ReachabilityState::LocalOnly);
     assert_eq!(wifi.services[0].name, "Wi-Fi");
     assert_eq!(wifi.services[0].status, NetworkServiceStatus::Enabled);
     assert_eq!(wifi.services[1].name, "Wi-Fi Diagnostics");
@@ -133,6 +140,15 @@ en3: flags=8822<BROADCAST,SMART,SIMPLEX,MULTICAST> mtu 1500
         .notes
         .iter()
         .any(|note| note.contains("Primary service: iPhone USB (disabled)")));
+}
+
+#[test]
+fn globally_routed_ip_and_gateway_are_treated_as_reachable() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("8.8.8.8".to_string());
+    interfaces[0].gateway = Some("1.1.1.1".to_string());
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
 }
 
 #[test]

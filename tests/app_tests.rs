@@ -273,9 +273,10 @@ fn sample_interfaces_expose_expected_reachability_states() {
 }
 
 #[test]
-fn public_ipv4_is_treated_as_reachable() {
+fn public_ipv4_without_gateway_is_still_treated_as_reachable() {
     let mut interfaces = sample_interfaces();
     interfaces[0].ipv4 = Some("8.8.8.8".to_string());
+    interfaces[0].gateway = None;
 
     assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
 }

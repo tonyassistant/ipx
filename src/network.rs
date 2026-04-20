@@ -90,6 +90,7 @@ pub struct NetworkInterface {
     pub status: InterfaceStatus,
     pub ipv4: Option<String>,
     pub mac: Option<String>,
+    pub gateway: Option<String>,
     pub services: Vec<NetworkService>,
     pub notes: Vec<String>,
 }
@@ -125,13 +126,27 @@ impl ReachabilityState {
 impl NetworkInterface {
     pub fn reachability(&self) -> ReachabilityState {
         match self.status {
-            InterfaceStatus::Connected => match self.ipv4.as_deref() {
-                Some(ip) if is_globally_routable_ipv4(ip) => ReachabilityState::Reachable,
-                Some(_) => ReachabilityState::LocalOnly,
-                None => ReachabilityState::LocalOnly,
-            },
+            InterfaceStatus::Connected => {
+                if self.has_verified_upstream_path() {
+                    ReachabilityState::Reachable
+                } else if self.ipv4.is_some() {
+                    ReachabilityState::LocalOnly
+                } else {
+                    ReachabilityState::LocalOnly
+                }
+            }
             InterfaceStatus::Disconnected => ReachabilityState::Down,
             InterfaceStatus::Inactive => ReachabilityState::Unknown,
+        }
+    }
+
+    fn has_verified_upstream_path(&self) -> bool {
+        match (self.ipv4.as_deref(), self.gateway.as_deref()) {
+            (Some(ip), Some(gateway)) => {
+                !is_private_or_special_ipv4(gateway) && !is_private_or_special_ipv4(ip)
+            }
+            (Some(ip), None) => is_globally_routable_ipv4(ip),
+            _ => false,
         }
     }
 
@@ -186,9 +201,14 @@ fn discover_macos_interfaces() -> Option<Vec<NetworkInterface>> {
     let service_order_text =
         run_command("networksetup", &["-listnetworkserviceorder"]).unwrap_or_default();
     let ifconfig_text = run_command("ifconfig", &[]).unwrap_or_default();
+    let routes_text = run_command("netstat", &["-rn", "-f", "inet"]).unwrap_or_default();
 
-    let interfaces =
-        build_interfaces_from_macos_outputs(&hardware_text, &service_order_text, &ifconfig_text);
+    let interfaces = build_interfaces_from_macos_outputs(
+        &hardware_text,
+        &service_order_text,
+        &ifconfig_text,
+        &routes_text,
+    );
     if interfaces.is_empty() {
         return None;
     }
@@ -200,6 +220,7 @@ pub fn build_interfaces_from_macos_outputs(
     hardware_text: &str,
     service_order_text: &str,
     ifconfig_text: &str,
+    routes_text: &str,
 ) -> Vec<NetworkInterface> {
     let mut interfaces = parse_networksetup_hardwareports(hardware_text);
     let services = parse_networksetup_service_order(service_order_text);
@@ -207,6 +228,7 @@ pub fn build_interfaces_from_macos_outputs(
 
     for iface in &mut interfaces {
         enrich_from_ifconfig(iface, ifconfig_text);
+        iface.gateway = parse_default_gateway(routes_text, &iface.device);
         finalize_interface_notes(iface);
     }
 
@@ -237,6 +259,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
                     status: InterfaceStatus::Inactive,
                     ipv4: None,
                     mac: mac.take(),
+                    gateway: None,
                     services: Vec::new(),
                     notes: vec!["Imported from networksetup hardware ports".to_string()],
                     name,
@@ -258,6 +281,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
             status: InterfaceStatus::Inactive,
             ipv4: None,
             mac,
+            gateway: None,
             services: Vec::new(),
             notes: vec!["Imported from networksetup hardware ports".to_string()],
             name,
@@ -484,30 +508,63 @@ fn is_likely_ethernet(value: &str) -> bool {
         || value.contains("10gbe")
 }
 
+fn parse_default_gateway(routes_text: &str, device: &str) -> Option<String> {
+    for line in routes_text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty()
+            || trimmed.starts_with("Routing tables")
+            || trimmed.starts_with("Internet:")
+        {
+            continue;
+        }
+
+        let columns = trimmed.split_whitespace().collect::<Vec<_>>();
+        if columns.len() < 4 {
+            continue;
+        }
+
+        if columns[0] != "default" {
+            continue;
+        }
+
+        if columns.last().copied() != Some(device) {
+            continue;
+        }
+
+        return Some(columns[1].to_string());
+    }
+
+    None
+}
+
 fn is_globally_routable_ipv4(ip: &str) -> bool {
+    !is_private_or_special_ipv4(ip)
+}
+
+fn is_private_or_special_ipv4(ip: &str) -> bool {
     let octets = ip
         .split('.')
         .map(str::parse::<u8>)
         .collect::<Result<Vec<_>, _>>();
 
     let Ok(octets) = octets else {
-        return false;
+        return true;
     };
 
     if octets.len() != 4 {
-        return false;
+        return true;
     }
 
     match octets.as_slice() {
-        [10, ..] => false,
-        [127, ..] => false,
-        [169, 254, ..] => false,
-        [172, second, ..] if (16..=31).contains(second) => false,
-        [192, 168, ..] => false,
-        [100, second, ..] if (64..=127).contains(second) => false,
-        [0, ..] => false,
-        [255, 255, 255, 255] => false,
-        _ => true,
+        [10, ..] => true,
+        [127, ..] => true,
+        [169, 254, ..] => true,
+        [172, second, ..] if (16..=31).contains(second) => true,
+        [192, 168, ..] => true,
+        [100, second, ..] if (64..=127).contains(second) => true,
+        [0, ..] => true,
+        [255, 255, 255, 255] => true,
+        _ => false,
     }
 }
 
@@ -520,6 +577,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             status: InterfaceStatus::Connected,
             ipv4: Some("192.168.1.24".to_string()),
             mac: Some("ac:de:48:00:11:22".to_string()),
+            gateway: Some("192.168.1.1".to_string()),
             services: vec![NetworkService {
                 name: "Wi-Fi".to_string(),
                 status: NetworkServiceStatus::Enabled,
@@ -539,6 +597,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             status: InterfaceStatus::Disconnected,
             ipv4: None,
             mac: Some("ac:de:48:00:11:44".to_string()),
+            gateway: None,
             services: vec![NetworkService {
                 name: "USB 10/100/1000 LAN".to_string(),
                 status: NetworkServiceStatus::Enabled,
@@ -555,6 +614,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             status: InterfaceStatus::Inactive,
             ipv4: None,
             mac: Some("ac:de:48:00:11:33".to_string()),
+            gateway: None,
             services: vec![NetworkService {
                 name: "Thunderbolt Bridge".to_string(),
                 status: NetworkServiceStatus::Enabled,
