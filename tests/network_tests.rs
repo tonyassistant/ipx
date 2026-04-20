@@ -125,7 +125,7 @@ default            192.168.1.1        UGScg                 en0
     assert!(wifi
         .notes
         .iter()
-        .any(|note| note.contains("Primary service: Wi-Fi (enabled)")));
+        .any(|note| note.contains("Primary service: Wi-Fi (enabled) • priority 1")));
 
     let iphone_usb = interfaces
         .iter()

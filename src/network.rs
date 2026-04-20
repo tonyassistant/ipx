@@ -544,11 +544,17 @@ fn finalize_interface_notes(iface: &mut NetworkInterface) {
             .or_else(|| iface.services.first());
 
         if let Some(service) = primary {
-            iface.notes.push(format!(
+            let mut summary = format!(
                 "Primary service: {} ({})",
                 service.name,
                 service.status.label()
-            ));
+            );
+
+            if let Some(order) = service.order {
+                summary.push_str(&format!(" • priority {order}"));
+            }
+
+            iface.notes.push(summary);
         }
     }
 }
