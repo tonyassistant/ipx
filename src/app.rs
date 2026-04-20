@@ -55,6 +55,7 @@ pub struct InterfaceCounts {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterfaceVisibility {
     All,
+    GroupInactive,
     ActiveOnly,
     InactiveOnly,
 }
@@ -63,6 +64,7 @@ impl InterfaceVisibility {
     pub fn title(&self) -> &'static str {
         match self {
             Self::All => "all",
+            Self::GroupInactive => "grouped",
             Self::ActiveOnly => "active",
             Self::InactiveOnly => "inactive",
         }
@@ -70,7 +72,8 @@ impl InterfaceVisibility {
 
     pub fn next(self) -> Self {
         match self {
-            Self::All => Self::ActiveOnly,
+            Self::All => Self::GroupInactive,
+            Self::GroupInactive => Self::ActiveOnly,
             Self::ActiveOnly => Self::InactiveOnly,
             Self::InactiveOnly => Self::All,
         }
@@ -78,7 +81,7 @@ impl InterfaceVisibility {
 
     pub fn includes(&self, status: &InterfaceStatus) -> bool {
         match self {
-            Self::All => true,
+            Self::All | Self::GroupInactive => true,
             Self::ActiveOnly => *status != InterfaceStatus::Inactive,
             Self::InactiveOnly => *status == InterfaceStatus::Inactive,
         }
@@ -185,6 +188,22 @@ impl App {
             .collect()
     }
 
+    pub fn grouped_interfaces(
+        &self,
+    ) -> (
+        Vec<(usize, &NetworkInterface)>,
+        Vec<(usize, &NetworkInterface)>,
+    ) {
+        let visible = self.visible_interfaces();
+        if self.interface_visibility != InterfaceVisibility::GroupInactive {
+            return (visible, Vec::new());
+        }
+
+        visible
+            .into_iter()
+            .partition(|(_, iface)| iface.status != InterfaceStatus::Inactive)
+    }
+
     pub fn selected_interface(&self) -> Option<&NetworkInterface> {
         let visible = self.visible_interface_indexes();
         if visible.is_empty() {
@@ -235,6 +254,7 @@ impl App {
             "refresh",
             "reload",
             "show all",
+            "group inactive",
             "show active",
             "show inactive",
             "help",
@@ -527,12 +547,13 @@ impl App {
             "refresh" | "reload" => self.invoke_action(ActionKind::RefreshState),
             "help" => {
                 self.log.push(
-                    "available commands: refresh, reload, show all, show active, show inactive, help, copy, inspect, renew, quit"
+                    "available commands: refresh, reload, show all, group inactive, show active, show inactive, help, copy, inspect, renew, quit"
                         .to_string(),
                 );
                 self.status_line = "Help opened in event log".to_string();
             }
             "show all" => self.set_interface_visibility(InterfaceVisibility::All),
+            "group inactive" => self.set_interface_visibility(InterfaceVisibility::GroupInactive),
             "show active" => self.set_interface_visibility(InterfaceVisibility::ActiveOnly),
             "show inactive" => self.set_interface_visibility(InterfaceVisibility::InactiveOnly),
             "copy" => self.invoke_action(ActionKind::CopySummary),

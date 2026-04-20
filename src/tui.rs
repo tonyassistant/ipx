@@ -188,11 +188,47 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_interface_list(frame: &mut Frame, app: &App, area: Rect) {
     let visible = app.visible_interfaces();
+    let (primary, inactive) = app.grouped_interfaces();
     let items: Vec<ListItem> = if visible.is_empty() {
         vec![ListItem::new(Line::from(Span::styled(
             "No interfaces match the current visibility filter",
             Style::default().fg(OPERATOR_MUTED),
         )))]
+    } else if app.interface_visibility == crate::app::InterfaceVisibility::GroupInactive {
+        let mut items = Vec::new();
+
+        if !primary.is_empty() {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "Active and degraded",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ))));
+            items.extend(
+                primary
+                    .iter()
+                    .map(|(idx, iface)| ListItem::new(interface_row(iface, *idx == app.selected))),
+            );
+        }
+
+        if !inactive.is_empty() {
+            if !items.is_empty() {
+                items.push(ListItem::new(Line::from("")));
+            }
+            items.push(ListItem::new(Line::from(Span::styled(
+                format!("Inactive ({})", inactive.len()),
+                Style::default()
+                    .fg(OPERATOR_MUTED)
+                    .add_modifier(Modifier::BOLD),
+            ))));
+            items.extend(
+                inactive
+                    .iter()
+                    .map(|(idx, iface)| ListItem::new(interface_row(iface, *idx == app.selected))),
+            );
+        }
+
+        items
     } else {
         visible
             .iter()

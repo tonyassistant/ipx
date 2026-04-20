@@ -113,6 +113,7 @@ fn palette_suggestions_include_operator_commands() {
     let app = App::new(sample_interfaces());
     assert!(app.palette_suggestions().contains(&"refresh"));
     assert!(app.palette_suggestions().contains(&"show active"));
+    assert!(app.palette_suggestions().contains(&"group inactive"));
     assert!(app.palette_suggestions().contains(&"renew"));
     assert!(app.palette_suggestions().contains(&"quit"));
 }
@@ -145,6 +146,9 @@ fn can_filter_to_inactive_interfaces_only() {
 fn cycling_visibility_rotates_through_modes() {
     let mut app = App::new(sample_interfaces());
     assert_eq!(app.interface_visibility, InterfaceVisibility::All);
+
+    app.cycle_interface_visibility();
+    assert_eq!(app.interface_visibility, InterfaceVisibility::GroupInactive);
 
     app.cycle_interface_visibility();
     assert_eq!(app.interface_visibility, InterfaceVisibility::ActiveOnly);
@@ -180,6 +184,20 @@ fn palette_can_switch_visibility_modes() {
         .log
         .iter()
         .any(|entry| entry.contains("interface visibility set to inactive")));
+}
+
+#[test]
+fn palette_can_group_inactive_interfaces() {
+    let mut app = App::new(sample_interfaces());
+    app.open_palette();
+    app.palette = "group inactive".into();
+    app.execute_palette();
+
+    assert_eq!(app.interface_visibility, InterfaceVisibility::GroupInactive);
+    let (primary, inactive) = app.grouped_interfaces();
+    assert_eq!(primary.len(), 2);
+    assert_eq!(inactive.len(), 1);
+    assert_eq!(inactive[0].1.name, "Thunderbolt Bridge");
 }
 
 #[test]
