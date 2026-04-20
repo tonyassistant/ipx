@@ -133,11 +133,11 @@ pub fn execute_action(spec: &ActionSpec, iface: &NetworkInterface) -> ActionExec
     match spec.kind {
         ActionKind::RefreshState => ActionExecution {
             log_entry: format!("refresh requested for {}", iface.name),
-            status_line: format!("Refresh requested for {}", iface.name),
+            status_line: format!("Refreshing {} telemetry", iface.name),
             outcome: ActionOutcome {
-                headline: "Refresh queued".to_string(),
+                headline: "Telemetry refresh started".to_string(),
                 detail: Some(format!(
-                    "{} remains selected while telemetry reloads.",
+                    "Reloading interface state, reachability, and mapped services for {}.",
                     iface.name
                 )),
             },
@@ -172,10 +172,13 @@ pub fn execute_action(spec: &ActionSpec, iface: &NetworkInterface) -> ActionExec
                 "blocked mutating action for {}: DHCP renew stays disabled in v1",
                 iface.name
             ),
-            status_line: "Mutating actions stay disabled in v1".to_string(),
+            status_line: format!("DHCP renew blocked for {}", iface.name),
             outcome: ActionOutcome {
-                headline: "Live network change blocked".to_string(),
-                detail: Some("DHCP renew stays confirmation-gated and disabled in v1.".to_string()),
+                headline: "DHCP renew requires a live-change path".to_string(),
+                detail: Some(format!(
+                    "{} stays confirmation-gated and disabled in v1, so no lease request was sent.",
+                    iface.name
+                )),
             },
             effect: ActionEffect::Noop,
         },

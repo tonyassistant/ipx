@@ -82,6 +82,22 @@ fn executing_palette_command_preserves_resulting_status() {
 }
 
 #[test]
+fn refresh_command_reports_richer_feedback() {
+    let mut app = App::new(sample_interfaces());
+    app.open_palette();
+    app.palette = "refresh".into();
+    app.execute_palette();
+
+    assert_eq!(app.status_line, "Refreshing Wi-Fi telemetry");
+    assert_eq!(
+        app.action_feedback
+            .as_ref()
+            .map(|feedback| feedback.headline.as_str()),
+        Some("Telemetry refresh started")
+    );
+}
+
+#[test]
 fn dismissing_palette_without_command_resets_status() {
     let mut app = App::new(sample_interfaces());
     app.open_palette();

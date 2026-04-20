@@ -36,7 +36,26 @@ fn mutating_action_requires_confirmation_and_stays_blocked() {
 
     app.confirm_pending_action();
     assert!(app.pending_confirmation.is_none());
-    assert_eq!(app.status_line, "Mutating actions stay disabled in v1");
+    assert_eq!(app.status_line, "DHCP renew blocked for Wi-Fi");
+    assert_eq!(
+        app.action_feedback
+            .as_ref()
+            .map(|feedback| feedback.headline.as_str()),
+        Some("DHCP renew requires a live-change path")
+    );
+}
+
+#[test]
+fn refresh_action_uses_operator_feedback_language() {
+    let iface = &sample_interfaces()[0];
+    let spec = action_catalog(iface)
+        .into_iter()
+        .find(|spec| spec.kind == ActionKind::RefreshState)
+        .unwrap();
+
+    let execution = execute_action(&spec, iface);
+    assert_eq!(execution.status_line, "Refreshing Wi-Fi telemetry");
+    assert_eq!(execution.outcome.headline, "Telemetry refresh started");
 }
 
 #[test]
