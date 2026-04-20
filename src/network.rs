@@ -94,7 +94,49 @@ pub struct NetworkInterface {
     pub notes: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReachabilityState {
+    Reachable,
+    LocalOnly,
+    Down,
+    Unknown,
+}
+
+impl ReachabilityState {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Reachable => "reachable",
+            Self::LocalOnly => "local only",
+            Self::Down => "down",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn note(&self) -> &'static str {
+        match self {
+            Self::Reachable => "Internet path appears available",
+            Self::LocalOnly => "Interface has a local address but no verified upstream path",
+            Self::Down => "No active path detected for this interface",
+            Self::Unknown => "Reachability has not been evaluated yet",
+        }
+    }
+}
+
 impl NetworkInterface {
+    pub fn reachability(&self) -> ReachabilityState {
+        match self.status {
+            InterfaceStatus::Connected => {
+                if self.ipv4.is_some() {
+                    ReachabilityState::Reachable
+                } else {
+                    ReachabilityState::LocalOnly
+                }
+            }
+            InterfaceStatus::Disconnected => ReachabilityState::Down,
+            InterfaceStatus::Inactive => ReachabilityState::Unknown,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn summary(&self) -> String {
         format!("{} ({}) [{}]", self.name, self.device, self.status.label())
@@ -107,6 +149,7 @@ impl NetworkInterface {
             format!("Device: {}", self.device),
             format!("Kind: {}", self.kind.label()),
             format!("Status: {}", self.status.label()),
+            format!("Reachability: {}", self.reachability().label()),
             format!("IPv4: {}", self.ipv4.as_deref().unwrap_or("-")),
             format!("MAC: {}", self.mac.as_deref().unwrap_or("-")),
         ];

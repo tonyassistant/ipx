@@ -1,5 +1,5 @@
 use ipx::app::{App, DetailTab, Focus, InterfaceVisibility};
-use ipx::network::sample_interfaces;
+use ipx::network::{sample_interfaces, ReachabilityState};
 
 #[test]
 fn selection_wraps_forward() {
@@ -261,4 +261,13 @@ fn cancelling_confirmation_sets_feedback() {
             .map(|feedback| feedback.headline.as_str()),
         Some("Action cancelled")
     );
+}
+
+#[test]
+fn sample_interfaces_expose_expected_reachability_states() {
+    let interfaces = sample_interfaces();
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
+    assert_eq!(interfaces[1].reachability(), ReachabilityState::Down);
+    assert_eq!(interfaces[2].reachability(), ReachabilityState::Unknown);
 }

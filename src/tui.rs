@@ -15,7 +15,7 @@ use ratatui::{
 use crate::{
     actions::ActionSafety,
     app::{App, DetailTab, Focus},
-    network::{InterfaceStatus, NetworkInterface},
+    network::{InterfaceStatus, NetworkInterface, ReachabilityState},
 };
 
 const OPERATOR_AMBER: Color = Color::Rgb(255, 191, 87);
@@ -454,6 +454,11 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
         kv_line("Device", iface.device.clone()),
         kv_line("Kind", iface.kind.label().to_string()),
         kv_line("Status", iface.status.label().to_string()),
+        styled_kv_line(
+            "Reach",
+            iface.reachability().label().to_string(),
+            reachability_style(iface.reachability()),
+        ),
         kv_line(
             "IPv4",
             iface.ipv4.clone().unwrap_or_else(|| "-".to_string()),
@@ -484,9 +489,13 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
 }
 
 fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
+    let reachability = iface.reachability();
+
     vec![
         section_line("Live posture"),
         bullet_line(format!("Link state {}", iface.status.label())),
+        bullet_line(format!("Reachability {}", reachability.label())),
+        bullet_line(reachability.note().to_string()),
         bullet_line(format!(
             "Address {}",
             iface.ipv4.as_deref().unwrap_or("unassigned")
@@ -496,7 +505,7 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
         section_line("Next parser pass"),
         bullet_line("RSSI and noise floor for Wi-Fi surfaces".to_string()),
         bullet_line("Negotiated speed and duplex for wired links".to_string()),
-        bullet_line("Evented link transitions in the log rail".to_string()),
+        bullet_line("Active probe-backed reachability validation".to_string()),
     ]
 }
 
@@ -549,6 +558,18 @@ fn kv_line(label: &str, value: String) -> Line<'static> {
     ])
 }
 
+fn styled_kv_line(label: &str, value: String, value_style: Style) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("{label:>8} "),
+            Style::default()
+                .fg(OPERATOR_MUTED)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(value, value_style),
+    ])
+}
+
 fn section_line(title: &str) -> Line<'static> {
     Line::from(Span::styled(
         title.to_string(),
@@ -592,6 +613,14 @@ fn status_style(status: &InterfaceStatus) -> Style {
         InterfaceStatus::Connected => Style::default().fg(Color::Green),
         InterfaceStatus::Disconnected => Style::default().fg(OPERATOR_AMBER),
         InterfaceStatus::Inactive => Style::default().fg(OPERATOR_MUTED),
+    }
+}
+
+fn reachability_style(state: ReachabilityState) -> Style {
+    match state {
+        ReachabilityState::Reachable => Style::default().fg(Color::Green),
+        ReachabilityState::LocalOnly => Style::default().fg(OPERATOR_AMBER),
+        ReachabilityState::Down | ReachabilityState::Unknown => Style::default().fg(OPERATOR_MUTED),
     }
 }
 
