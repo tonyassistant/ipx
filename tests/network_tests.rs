@@ -154,6 +154,15 @@ fn globally_routed_ip_and_gateway_are_treated_as_reachable() {
 }
 
 #[test]
+fn cgnat_and_documentation_ranges_are_not_treated_as_public_reachability() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("100.64.10.20".to_string());
+    interfaces[0].gateway = Some("192.0.2.1".to_string());
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::PrivateRoute);
+}
+
+#[test]
 fn sample_interfaces_include_service_model() {
     let interfaces = sample_interfaces();
     assert!(!interfaces[0].services.is_empty());
@@ -225,6 +234,15 @@ default via 10.0.0.1 dev wlan0 proto dhcp src 10.0.0.8 metric 600
         .origin
         .service_mapping_note()
         .contains("not yet available on Linux"));
+}
+
+#[test]
+fn multicast_and_reserved_ranges_are_not_treated_as_public_reachability() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("224.0.0.1".to_string());
+    interfaces[0].gateway = Some("240.0.0.1".to_string());
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::PrivateRoute);
 }
 
 #[test]

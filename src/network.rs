@@ -924,14 +924,21 @@ fn is_private_or_special_ipv4(ip: &str) -> bool {
     }
 
     match octets.as_slice() {
+        [0, ..] => true,
         [10, ..] => true,
+        [100, second, ..] if (64..=127).contains(second) => true,
         [127, ..] => true,
         [169, 254, ..] => true,
         [172, second, ..] if (16..=31).contains(second) => true,
+        [192, 0, 0, ..] => true,
+        [192, 0, 2, ..] => true,
+        [192, 88, 99, ..] => true,
         [192, 168, ..] => true,
-        [100, second, ..] if (64..=127).contains(second) => true,
-        [0, ..] => true,
-        [255, 255, 255, 255] => true,
+        [198, 18 | 19, ..] => true,
+        [198, 51, 100, ..] => true,
+        [203, 0, 113, ..] => true,
+        [224..=239, ..] => true,
+        [240..=255, ..] => true,
         _ => false,
     }
 }
