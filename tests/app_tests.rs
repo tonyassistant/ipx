@@ -267,7 +267,15 @@ fn cancelling_confirmation_sets_feedback() {
 fn sample_interfaces_expose_expected_reachability_states() {
     let interfaces = sample_interfaces();
 
-    assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::LocalOnly);
     assert_eq!(interfaces[1].reachability(), ReachabilityState::Down);
     assert_eq!(interfaces[2].reachability(), ReachabilityState::Unknown);
+}
+
+#[test]
+fn public_ipv4_is_treated_as_reachable() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("8.8.8.8".to_string());
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::Reachable);
 }

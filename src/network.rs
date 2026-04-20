@@ -125,13 +125,11 @@ impl ReachabilityState {
 impl NetworkInterface {
     pub fn reachability(&self) -> ReachabilityState {
         match self.status {
-            InterfaceStatus::Connected => {
-                if self.ipv4.is_some() {
-                    ReachabilityState::Reachable
-                } else {
-                    ReachabilityState::LocalOnly
-                }
-            }
+            InterfaceStatus::Connected => match self.ipv4.as_deref() {
+                Some(ip) if is_globally_routable_ipv4(ip) => ReachabilityState::Reachable,
+                Some(_) => ReachabilityState::LocalOnly,
+                None => ReachabilityState::LocalOnly,
+            },
             InterfaceStatus::Disconnected => ReachabilityState::Down,
             InterfaceStatus::Inactive => ReachabilityState::Unknown,
         }
@@ -484,6 +482,33 @@ fn is_likely_ethernet(value: &str) -> bool {
         || value.contains("gigabit")
         || value.contains("10/100")
         || value.contains("10gbe")
+}
+
+fn is_globally_routable_ipv4(ip: &str) -> bool {
+    let octets = ip
+        .split('.')
+        .map(str::parse::<u8>)
+        .collect::<Result<Vec<_>, _>>();
+
+    let Ok(octets) = octets else {
+        return false;
+    };
+
+    if octets.len() != 4 {
+        return false;
+    }
+
+    match octets.as_slice() {
+        [10, ..] => false,
+        [127, ..] => false,
+        [169, 254, ..] => false,
+        [172, second, ..] if (16..=31).contains(second) => false,
+        [192, 168, ..] => false,
+        [100, second, ..] if (64..=127).contains(second) => false,
+        [0, ..] => false,
+        [255, 255, 255, 255] => false,
+        _ => true,
+    }
 }
 
 pub fn sample_interfaces() -> Vec<NetworkInterface> {
