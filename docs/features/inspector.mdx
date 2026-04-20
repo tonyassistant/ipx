@@ -24,9 +24,23 @@ Shows the selected interface in a practical format:
 
 ## Signals
 
-The Signals view reserves space for link and signal-oriented surfaces.
+The Signals view shows live posture and route context for the selected interface.
 
-In v1, it acts as a structured place for that future detail without overloading the main overview.
+In v1 it currently highlights:
+
+- link state
+- reachability posture
+- IPv4 address
+- gateway presence
+- default-route context
+- service-binding count
+- platform-specific discovery notes
+
+Reachability is intentionally conservative:
+- `reachable` means the interface looks globally routed
+- `private route` means a default route exists, but the upstream is still private
+- `local only` means there is an address without a credible upstream path
+- `down` and `unknown` remain explicit
 
 ## Actions
 

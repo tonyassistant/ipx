@@ -32,7 +32,7 @@ ipx can currently map:
 
 - interfaces and devices
 - basic addressing and status information
-- default gateway context
+- default gateway and default-route context
 - virtual interfaces on supported platforms
 - service-to-interface mapping where the platform exposes it clearly, including primary-service priority on macOS
 
@@ -42,6 +42,19 @@ ipx can currently map:
 - Linux currently focuses on interface, address, gateway, and virtual-interface discovery
 - Windows currently focuses on interface, address, gateway, and adapter classification
 
+## Reachability posture
+
+ipx derives an inspect-first reachability posture from address and route data.
+
+Current states:
+- `reachable` for interfaces that appear globally routed
+- `private route` for interfaces that carry a default route on private upstream space
+- `local only` for interfaces with local addressing but no credible upstream path
+- `down` for disconnected interfaces
+- `unknown` for inactive interfaces
+
+This is not a packet probe yet. It is a conservative operator hint based on discovered route truth.
+
 ## v1 expectation
 
-This is enough for a strong inspect-first v1, while deeper signal, service-state, and platform-parity work continues over time.
+This is enough for a strong inspect-first v1, while deeper signal, service-state, probe-backed validation, and platform-parity work continues over time.
