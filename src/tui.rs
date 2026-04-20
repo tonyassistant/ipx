@@ -540,6 +540,14 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
             "Gateway {}",
             iface.gateway.as_deref().unwrap_or("unassigned")
         )),
+        bullet_line(format!(
+            "Default route {}",
+            iface
+                .default_route
+                .as_ref()
+                .map(|route| route.summary())
+                .unwrap_or_else(|| "unassigned".to_string())
+        )),
         bullet_line(format!("Service bindings {}", iface.services.len())),
         Line::from(""),
         section_line("Next parser pass"),

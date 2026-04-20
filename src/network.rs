@@ -83,6 +83,29 @@ impl NetworkService {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DefaultRoute {
+    pub gateway: String,
+    pub metric: Option<u32>,
+    pub source: Option<String>,
+}
+
+impl DefaultRoute {
+    pub fn summary(&self) -> String {
+        let mut parts = vec![self.gateway.clone()];
+
+        if let Some(metric) = self.metric {
+            parts.push(format!("metric {metric}"));
+        }
+
+        if let Some(source) = &self.source {
+            parts.push(format!("src {source}"));
+        }
+
+        parts.join(" • ")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NetworkInterface {
     pub name: String,
     pub device: String,
@@ -91,6 +114,7 @@ pub struct NetworkInterface {
     pub ipv4: Option<String>,
     pub mac: Option<String>,
     pub gateway: Option<String>,
+    pub default_route: Option<DefaultRoute>,
     pub services: Vec<NetworkService>,
     pub notes: Vec<String>,
 }
@@ -165,6 +189,13 @@ impl NetworkInterface {
             format!("Reachability: {}", self.reachability().label()),
             format!("IPv4: {}", self.ipv4.as_deref().unwrap_or("-")),
             format!("MAC: {}", self.mac.as_deref().unwrap_or("-")),
+            format!(
+                "Default route: {}",
+                self.default_route
+                    .as_ref()
+                    .map(DefaultRoute::summary)
+                    .unwrap_or_else(|| "-".to_string())
+            ),
         ];
 
         if self.services.is_empty() {
@@ -260,6 +291,11 @@ pub fn build_interfaces_from_macos_outputs(
     for iface in &mut interfaces {
         enrich_from_ifconfig(iface, ifconfig_text);
         iface.gateway = parse_default_gateway(routes_text, &iface.device);
+        iface.default_route = iface.gateway.as_ref().map(|gateway| DefaultRoute {
+            gateway: gateway.clone(),
+            metric: None,
+            source: None,
+        });
         finalize_interface_notes(iface);
     }
 
@@ -291,6 +327,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
                     ipv4: None,
                     mac: mac.take(),
                     gateway: None,
+                    default_route: None,
                     services: Vec::new(),
                     notes: vec!["Imported from networksetup hardware ports".to_string()],
                     name,
@@ -313,6 +350,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
             ipv4: None,
             mac,
             gateway: None,
+            default_route: None,
             services: Vec::new(),
             notes: vec!["Imported from networksetup hardware ports".to_string()],
             name,
@@ -515,7 +553,12 @@ fn finalize_interface_notes(iface: &mut NetworkInterface) {
 
 fn classify_kind(name: &str, device: &str) -> InterfaceKind {
     let l = format!("{} {}", name.to_lowercase(), device.to_lowercase());
-    if l.contains("wi-fi") || l.contains("wifi") || l.contains("airport") || l.contains("wireless") || l.contains("wlan") {
+    if l.contains("wi-fi")
+        || l.contains("wifi")
+        || l.contains("airport")
+        || l.contains("wireless")
+        || l.contains("wlan")
+    {
         InterfaceKind::Wireless
     } else if l.contains("bridge") {
         InterfaceKind::Bridge
@@ -593,7 +636,11 @@ pub fn build_interfaces_from_linux_outputs(
 
     for iface in &mut interfaces {
         enrich_from_linux_ip_addr(iface, addr_text);
-        iface.gateway = parse_linux_default_gateway(route_text, &iface.device);
+        iface.default_route = parse_linux_default_route(route_text, &iface.device);
+        iface.gateway = iface
+            .default_route
+            .as_ref()
+            .map(|route| route.gateway.clone());
         finalize_interface_notes(iface);
     }
 
@@ -640,6 +687,7 @@ pub fn parse_linux_ip_link(input: &str) -> Vec<NetworkInterface> {
             ipv4: None,
             mac: parse_linux_mac(details_part),
             gateway: None,
+            default_route: None,
             services: Vec::new(),
             notes: vec!["Imported from ip link show".to_string()],
         });
@@ -677,7 +725,7 @@ fn enrich_from_linux_ip_addr(iface: &mut NetworkInterface, addr_text: &str) {
     }
 }
 
-fn parse_linux_default_gateway(route_text: &str, device: &str) -> Option<String> {
+fn parse_linux_default_route(route_text: &str, device: &str) -> Option<DefaultRoute> {
     for line in route_text.lines() {
         let columns = line.split_whitespace().collect::<Vec<_>>();
         if columns.len() < 5 || columns.first().copied() != Some("default") {
@@ -692,9 +740,26 @@ fn parse_linux_default_gateway(route_text: &str, device: &str) -> Option<String>
             .windows(2)
             .find(|window| window[0] == "dev")?
             .get(1)?;
-        if *dev == device {
-            return Some((*via).to_string());
+        if *dev != device {
+            continue;
         }
+
+        let metric = columns
+            .windows(2)
+            .find(|window| window[0] == "metric")
+            .and_then(|window| window.get(1))
+            .and_then(|value| value.parse::<u32>().ok());
+        let source = columns
+            .windows(2)
+            .find(|window| window[0] == "src")
+            .and_then(|window| window.get(1))
+            .map(|value| (*value).to_string());
+
+        return Some(DefaultRoute {
+            gateway: (*via).to_string(),
+            metric,
+            source,
+        });
     }
 
     None
@@ -777,6 +842,7 @@ fn empty_windows_interface() -> NetworkInterface {
         ipv4: None,
         mac: None,
         gateway: None,
+        default_route: None,
         services: Vec::new(),
         notes: vec!["Imported from ipconfig /all".to_string()],
     }
@@ -835,6 +901,11 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             ipv4: Some("192.168.1.24".to_string()),
             mac: Some("ac:de:48:00:11:22".to_string()),
             gateway: Some("192.168.1.1".to_string()),
+            default_route: Some(DefaultRoute {
+                gateway: "192.168.1.1".to_string(),
+                metric: None,
+                source: Some("192.168.1.24".to_string()),
+            }),
             services: vec![NetworkService {
                 name: "Wi-Fi".to_string(),
                 status: NetworkServiceStatus::Enabled,
@@ -855,6 +926,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             ipv4: None,
             mac: Some("ac:de:48:00:11:44".to_string()),
             gateway: None,
+            default_route: None,
             services: vec![NetworkService {
                 name: "USB 10/100/1000 LAN".to_string(),
                 status: NetworkServiceStatus::Enabled,
@@ -872,6 +944,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
             ipv4: None,
             mac: Some("ac:de:48:00:11:33".to_string()),
             gateway: None,
+            default_route: None,
             services: vec![NetworkService {
                 name: "Thunderbolt Bridge".to_string(),
                 status: NetworkServiceStatus::Enabled,

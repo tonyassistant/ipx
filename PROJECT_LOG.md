@@ -5,7 +5,7 @@ This file tracks short public execution notes for the repository.
 ## Current status
 
 - Focus: release/install reliability and product polish
-- Near-term work: Linux discovery now normalizes peer-qualified device names from `ip link`, next up active probe validation behind route-aware reachability posture and broader platform support
+- Near-term work: Linux discovery now exposes default-route metric and source details in the inspector, next up active probe validation behind route-aware reachability posture and broader platform support
 
 ## Operating notes
 

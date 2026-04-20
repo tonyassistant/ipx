@@ -10,7 +10,7 @@ Current foundations in the repo:
 - Rust application structure
 - modular TUI architecture
 - macOS-oriented interface discovery with fallback sample data
-- initial Linux and Windows discovery scaffolding
+- initial Linux and Windows discovery scaffolding, now including Linux default-route metric and source visibility
 - command palette shell
 - safe v1 action framework with confirmation gates for risky network operations
 - event log and inspector layout

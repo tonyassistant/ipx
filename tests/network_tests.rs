@@ -191,6 +191,7 @@ fn builds_linux_interfaces_with_addresses_and_gateway() {
 "#;
     let route = r#"
 default via 192.168.1.1 dev eth0 proto dhcp src 192.168.1.50 metric 100
+default via 10.0.0.1 dev wlan0 proto dhcp src 10.0.0.8 metric 600
 "#;
 
     let interfaces = build_interfaces_from_linux_outputs(link, addr, route);
@@ -200,6 +201,10 @@ default via 192.168.1.1 dev eth0 proto dhcp src 192.168.1.50 metric 100
         .unwrap();
     assert_eq!(eth0.ipv4.as_deref(), Some("192.168.1.50"));
     assert_eq!(eth0.gateway.as_deref(), Some("192.168.1.1"));
+    let default_route = eth0.default_route.as_ref().unwrap();
+    assert_eq!(default_route.gateway, "192.168.1.1");
+    assert_eq!(default_route.metric, Some(100));
+    assert_eq!(default_route.source.as_deref(), Some("192.168.1.50"));
 
     let docker0 = interfaces
         .iter()
