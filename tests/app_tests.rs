@@ -73,6 +73,12 @@ fn executing_palette_command_preserves_resulting_status() {
 
     assert_eq!(app.focus, Focus::List);
     assert_eq!(app.status_line, "Copied en0 summary");
+    assert_eq!(
+        app.action_feedback
+            .as_ref()
+            .map(|feedback| feedback.headline.as_str()),
+        Some("Summary copied")
+    );
 }
 
 #[test]
@@ -82,6 +88,7 @@ fn dismissing_palette_without_command_resets_status() {
     app.dismiss_palette();
 
     assert_eq!(app.status_line, "Ready");
+    assert!(app.action_feedback.is_none());
 }
 
 #[test]
@@ -213,4 +220,37 @@ fn executing_empty_palette_without_query_keeps_palette_status() {
 
     assert_eq!(app.focus, Focus::List);
     assert_eq!(app.status_line, "Command palette");
+}
+
+#[test]
+fn risky_action_sets_confirmation_feedback() {
+    let mut app = App::new(sample_interfaces());
+    app.detail_tab = DetailTab::Actions;
+    app.action_selected = 3;
+
+    app.invoke_selected_action();
+
+    assert_eq!(
+        app.action_feedback
+            .as_ref()
+            .map(|feedback| feedback.headline.as_str()),
+        Some("Confirmation required")
+    );
+}
+
+#[test]
+fn cancelling_confirmation_sets_feedback() {
+    let mut app = App::new(sample_interfaces());
+    app.detail_tab = DetailTab::Actions;
+    app.action_selected = 3;
+    app.invoke_selected_action();
+
+    app.cancel_pending_action();
+
+    assert_eq!(
+        app.action_feedback
+            .as_ref()
+            .map(|feedback| feedback.headline.as_str()),
+        Some("Action cancelled")
+    );
 }

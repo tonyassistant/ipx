@@ -109,6 +109,7 @@ fn draw(frame: &mut Frame, app: &App) {
     let vertical = Layout::vertical([
         Constraint::Length(4),
         Constraint::Min(16),
+        Constraint::Length(6),
         Constraint::Length(8),
         Constraint::Length(2),
     ])
@@ -121,8 +122,9 @@ fn draw(frame: &mut Frame, app: &App) {
 
     draw_interface_list(frame, app, middle[0]);
     draw_inspector(frame, app, middle[1]);
-    draw_log(frame, app, vertical[2]);
-    draw_footer(frame, app, vertical[3]);
+    draw_action_feedback(frame, app, vertical[2]);
+    draw_log(frame, app, vertical[3]);
+    draw_footer(frame, app, vertical[4]);
 
     if app.focus == Focus::Palette {
         draw_palette(frame, app, area);
@@ -244,6 +246,41 @@ fn draw_inspector(frame: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(Color::DarkGray)),
         );
     frame.render_widget(details, detail_chunks[1]);
+}
+
+fn draw_action_feedback(frame: &mut Frame, app: &App, area: Rect) {
+    let lines = if let Some(feedback) = &app.action_feedback {
+        let mut lines = vec![Line::from(vec![Span::styled(
+            feedback.headline.as_str(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )])];
+
+        if let Some(detail) = &feedback.detail {
+            lines.push(Line::from(Span::styled(
+                detail.as_str(),
+                Style::default().fg(Color::White),
+            )));
+        }
+
+        lines
+    } else {
+        vec![Line::from(Span::styled(
+            "No recent action feedback",
+            Style::default().fg(OPERATOR_MUTED),
+        ))]
+    };
+
+    let feedback = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Action Feedback")
+                .border_style(Style::default().fg(Color::DarkGray)),
+        )
+        .wrap(Wrap { trim: true });
+    frame.render_widget(feedback, area);
 }
 
 fn draw_log(frame: &mut Frame, app: &App, area: Rect) {

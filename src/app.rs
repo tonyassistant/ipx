@@ -1,7 +1,7 @@
 use crate::{
     actions::{
-        action_catalog, execute_action, pending_confirmation, ActionEffect, ActionKind, ActionSpec,
-        PendingConfirmation,
+        action_catalog, execute_action, pending_confirmation, ActionEffect, ActionKind,
+        ActionOutcome, ActionSpec, PendingConfirmation,
     },
     network::{InterfaceStatus, NetworkInterface},
 };
@@ -96,6 +96,7 @@ pub struct App {
     pub log: Vec<String>,
     pub should_quit: bool,
     pub status_line: String,
+    pub action_feedback: Option<ActionOutcome>,
     pub action_selected: usize,
     pub pending_confirmation: Option<PendingConfirmation>,
     pub palette_selected: usize,
@@ -114,6 +115,7 @@ impl App {
             log: vec!["ipx initialized".to_string()],
             should_quit: false,
             status_line: "Ready".to_string(),
+            action_feedback: None,
             action_selected: 0,
             pending_confirmation: None,
             palette_selected: 0,
@@ -268,6 +270,7 @@ impl App {
         self.focus = Focus::Palette;
         self.palette.clear();
         self.palette_selected = 0;
+        self.action_feedback = None;
         self.status_line = "Command palette".to_string();
     }
 
@@ -277,6 +280,7 @@ impl App {
         self.palette_selected = 0;
         if self.pending_confirmation.is_none() {
             self.status_line = "Ready".to_string();
+            self.action_feedback = None;
         }
     }
 
@@ -305,6 +309,7 @@ impl App {
     pub fn set_interface_visibility(&mut self, visibility: InterfaceVisibility) {
         self.interface_visibility = visibility;
         self.pending_confirmation = None;
+        self.action_feedback = None;
         self.action_selected = 0;
 
         if let Some(first_visible) = self.visible_interface_indexes().first().copied() {
@@ -378,6 +383,13 @@ impl App {
 
         if matches!(spec.safety, crate::actions::ActionSafety::ConfirmRequired) {
             self.pending_confirmation = Some(pending_confirmation(spec.clone(), &iface));
+            self.action_feedback = Some(ActionOutcome {
+                headline: "Confirmation required".to_string(),
+                detail: Some(format!(
+                    "Review the prompt before running {} on {}.",
+                    spec.title, iface.name
+                )),
+            });
             self.status_line = format!("Confirmation required for {}", spec.title);
             self.log.push(format!(
                 "awaiting confirmation: {} on {}",
@@ -411,6 +423,12 @@ impl App {
                 pending.action.title
             ));
             self.status_line = "Confirmation expired".to_string();
+            self.action_feedback = Some(ActionOutcome {
+                headline: "Confirmation expired".to_string(),
+                detail: Some(
+                    "Selection changed before the gated action was confirmed.".to_string(),
+                ),
+            });
         }
     }
 
@@ -421,12 +439,20 @@ impl App {
                 pending.action.title, pending.interface_name
             ));
             self.status_line = format!("Cancelled {}", pending.action.title);
+            self.action_feedback = Some(ActionOutcome {
+                headline: "Action cancelled".to_string(),
+                detail: Some(format!(
+                    "{} on {} was dismissed before execution.",
+                    pending.action.title, pending.interface_name
+                )),
+            });
         }
     }
 
     fn apply_execution(&mut self, execution: crate::actions::ActionExecution) {
         self.log.push(execution.log_entry);
         self.status_line = execution.status_line;
+        self.action_feedback = Some(execution.outcome);
         match execution.effect {
             ActionEffect::Refresh => {}
             ActionEffect::CopySummary => {}

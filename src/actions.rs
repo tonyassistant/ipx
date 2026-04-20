@@ -93,9 +93,16 @@ pub enum ActionEffect {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionOutcome {
+    pub headline: String,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionExecution {
     pub log_entry: String,
     pub status_line: String,
+    pub outcome: ActionOutcome,
     pub effect: ActionEffect,
 }
 
@@ -127,16 +134,37 @@ pub fn execute_action(spec: &ActionSpec, iface: &NetworkInterface) -> ActionExec
         ActionKind::RefreshState => ActionExecution {
             log_entry: format!("refresh requested for {}", iface.name),
             status_line: format!("Refresh requested for {}", iface.name),
+            outcome: ActionOutcome {
+                headline: "Refresh queued".to_string(),
+                detail: Some(format!(
+                    "{} remains selected while telemetry reloads.",
+                    iface.name
+                )),
+            },
             effect: ActionEffect::Refresh,
         },
         ActionKind::CopySummary => ActionExecution {
             log_entry: format!("copied summary for {}", iface.device),
             status_line: format!("Copied {} summary", iface.device),
+            outcome: ActionOutcome {
+                headline: "Summary copied".to_string(),
+                detail: Some(format!(
+                    "{} is ready to paste into handoff notes.",
+                    iface.device
+                )),
+            },
             effect: ActionEffect::CopySummary,
         },
         ActionKind::InspectServices => ActionExecution {
             log_entry: format!("inspecting services for {}", iface.name),
             status_line: format!("Inspecting {} services", iface.name),
+            outcome: ActionOutcome {
+                headline: "Service inspection opened".to_string(),
+                detail: Some(format!(
+                    "Review mapped services and notes for {} in Overview.",
+                    iface.name
+                )),
+            },
             effect: ActionEffect::FocusOverview,
         },
         ActionKind::RenewDhcpLease => ActionExecution {
@@ -145,6 +173,10 @@ pub fn execute_action(spec: &ActionSpec, iface: &NetworkInterface) -> ActionExec
                 iface.name
             ),
             status_line: "Mutating actions stay disabled in v1".to_string(),
+            outcome: ActionOutcome {
+                headline: "Live network change blocked".to_string(),
+                detail: Some("DHCP renew stays confirmation-gated and disabled in v1.".to_string()),
+            },
             effect: ActionEffect::Noop,
         },
     }
