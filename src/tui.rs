@@ -485,6 +485,14 @@ fn detail_lines(app: &App) -> Vec<Line<'static>> {
 }
 
 fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
+    let primary_service = iface
+        .services
+        .iter()
+        .find(|service| service.status == crate::network::NetworkServiceStatus::Enabled)
+        .or_else(|| iface.services.first())
+        .map(|service| service.name.clone())
+        .unwrap_or_else(|| "-".to_string());
+
     let mut lines = vec![
         kv_line("Name", iface.name.clone()),
         kv_line("Device", iface.device.clone()),
@@ -499,6 +507,15 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
             "IPv4",
             iface.ipv4.clone().unwrap_or_else(|| "-".to_string()),
         ),
+        kv_line(
+            "Route",
+            iface
+                .default_route
+                .as_ref()
+                .map(|route| route.summary())
+                .unwrap_or_else(|| "-".to_string()),
+        ),
+        kv_line("Service", primary_service),
         kv_line("MAC", iface.mac.clone().unwrap_or_else(|| "-".to_string())),
         Line::from(""),
         section_line("Services"),
@@ -756,7 +773,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::{detail_title, focus_label};
+    use super::{detail_title, focus_label, overview_lines};
     use crate::{
         app::{App, Focus},
         network::sample_interfaces,
@@ -772,5 +789,19 @@ mod tests {
     fn focus_label_matches_focus_mode() {
         assert_eq!(focus_label(Focus::List), "LIST");
         assert_eq!(focus_label(Focus::Palette), "PALETTE");
+    }
+
+    #[test]
+    fn overview_lines_include_route_and_primary_service_summary() {
+        let interfaces = sample_interfaces();
+        let lines = overview_lines(&interfaces[0]);
+        let rendered = lines
+            .iter()
+            .map(|line| line.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("Route 192.168.1.1 • src 192.168.1.24"));
+        assert!(rendered.contains("Service Wi-Fi"));
     }
 }
