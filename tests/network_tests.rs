@@ -141,6 +141,7 @@ default            192.168.1.1        UGScg                 en0
         .notes
         .iter()
         .any(|note| note.contains("Primary service: iPhone USB (disabled)")));
+    assert_eq!(wifi.origin.label(), "macOS");
 }
 
 #[test]
@@ -219,6 +220,11 @@ default via 10.0.0.1 dev wlan0 proto dhcp src 10.0.0.8 metric 600
         .find(|iface| iface.device == "docker0")
         .unwrap();
     assert_eq!(docker0.kind, InterfaceKind::Virtual);
+    assert_eq!(eth0.origin.label(), "Linux");
+    assert!(eth0
+        .origin
+        .service_mapping_note()
+        .contains("not yet available on Linux"));
 }
 
 #[test]
@@ -248,4 +254,5 @@ Ethernet adapter vEthernet (WSL):
     assert_eq!(interfaces[0].gateway.as_deref(), Some("10.0.0.1"));
     assert_eq!(interfaces[1].kind, InterfaceKind::Virtual);
     assert_eq!(interfaces[1].status, InterfaceStatus::Disconnected);
+    assert_eq!(interfaces[0].origin.label(), "Windows");
 }

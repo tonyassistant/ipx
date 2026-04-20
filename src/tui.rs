@@ -15,7 +15,7 @@ use ratatui::{
 use crate::{
     actions::ActionSafety,
     app::{App, DetailTab, Focus},
-    network::{InterfaceStatus, NetworkInterface, ReachabilityState},
+    network::{DiscoveryOrigin, InterfaceStatus, NetworkInterface, ReachabilityState},
 };
 
 const OPERATOR_AMBER: Color = Color::Rgb(255, 191, 87);
@@ -508,6 +508,7 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
             iface.reachability().label().to_string(),
             reachability_style(iface.reachability()),
         ),
+        kv_line("Source", iface.origin.label().to_string()),
         kv_line(
             "IPv4",
             iface.ipv4.clone().unwrap_or_else(|| "-".to_string()),
@@ -524,10 +525,11 @@ fn overview_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
         kv_line("Service", primary_service),
         kv_line("MAC", iface.mac.clone().unwrap_or_else(|| "-".to_string())),
         Line::from(""),
-        section_line("Services"),
+        section_line(service_section_title(iface.origin)),
     ];
 
     if iface.services.is_empty() {
+        lines.push(bullet_line(iface.origin.service_mapping_note().to_string()));
         lines.push(bullet_line("No mapped services discovered".to_string()));
     } else {
         lines.extend(
@@ -572,6 +574,7 @@ fn signal_lines(iface: &NetworkInterface) -> Vec<Line<'static>> {
                 .unwrap_or_else(|| "unassigned".to_string())
         )),
         bullet_line(format!("Service bindings {}", iface.services.len())),
+        bullet_line(iface.origin.service_mapping_note().to_string()),
         Line::from(""),
         section_line("Next parser pass"),
         bullet_line("RSSI and noise floor for Wi-Fi surfaces".to_string()),
@@ -648,6 +651,13 @@ fn section_line(title: &str) -> Line<'static> {
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),
     ))
+}
+
+fn service_section_title(origin: DiscoveryOrigin) -> &'static str {
+    match origin {
+        DiscoveryOrigin::Macos | DiscoveryOrigin::Sample => "Services",
+        DiscoveryOrigin::Linux | DiscoveryOrigin::Windows => "Service mapping",
+    }
 }
 
 fn bullet_line(text: String) -> Line<'static> {
@@ -807,6 +817,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
 
+        assert!(rendered.contains("Source Sample data"));
         assert!(rendered.contains("Route 192.168.1.1 • src 192.168.1.24"));
         assert!(rendered.contains("Role primary uplink"));
         assert!(rendered.contains("Service Wi-Fi"));

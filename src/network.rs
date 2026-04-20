@@ -105,6 +105,34 @@ impl DefaultRoute {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DiscoveryOrigin {
+    Macos,
+    Linux,
+    Windows,
+    Sample,
+}
+
+impl DiscoveryOrigin {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Macos => "macOS",
+            Self::Linux => "Linux",
+            Self::Windows => "Windows",
+            Self::Sample => "Sample data",
+        }
+    }
+
+    pub fn service_mapping_note(&self) -> &'static str {
+        match self {
+            Self::Macos => "Service mapping comes from the host network service model.",
+            Self::Linux => "Service mapping is not yet available on Linux, so interface details focus on address and route truth.",
+            Self::Windows => "Service mapping is not yet available on Windows, so interface details focus on adapter and gateway truth.",
+            Self::Sample => "Service mapping is illustrated with bundled sample data.",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NetworkInterface {
     pub name: String,
@@ -117,6 +145,7 @@ pub struct NetworkInterface {
     pub default_route: Option<DefaultRoute>,
     pub services: Vec<NetworkService>,
     pub notes: Vec<String>,
+    pub origin: DiscoveryOrigin,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -336,6 +365,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
                     default_route: None,
                     services: Vec::new(),
                     notes: vec!["Imported from networksetup hardware ports".to_string()],
+                    origin: DiscoveryOrigin::Macos,
                     name,
                     device,
                 });
@@ -359,6 +389,7 @@ pub fn parse_networksetup_hardwareports(input: &str) -> Vec<NetworkInterface> {
             default_route: None,
             services: Vec::new(),
             notes: vec!["Imported from networksetup hardware ports".to_string()],
+            origin: DiscoveryOrigin::Macos,
             name,
             device,
         });
@@ -702,6 +733,7 @@ pub fn parse_linux_ip_link(input: &str) -> Vec<NetworkInterface> {
             default_route: None,
             services: Vec::new(),
             notes: vec!["Imported from ip link show".to_string()],
+            origin: DiscoveryOrigin::Linux,
         });
     }
 
@@ -857,6 +889,7 @@ fn empty_windows_interface() -> NetworkInterface {
         default_route: None,
         services: Vec::new(),
         notes: vec!["Imported from ipconfig /all".to_string()],
+        origin: DiscoveryOrigin::Windows,
     }
 }
 
@@ -929,6 +962,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
                 "Primary uplink".to_string(),
                 "RSSI visibility planned for next parser pass".to_string(),
             ],
+            origin: DiscoveryOrigin::Sample,
         },
         NetworkInterface {
             name: "USB Ethernet".to_string(),
@@ -947,6 +981,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
                 device: Some("en7".to_string()),
             }],
             notes: vec!["Cable not detected".to_string()],
+            origin: DiscoveryOrigin::Sample,
         },
         NetworkInterface {
             name: "Thunderbolt Bridge".to_string(),
@@ -965,6 +1000,7 @@ pub fn sample_interfaces() -> Vec<NetworkInterface> {
                 device: Some("bridge0".to_string()),
             }],
             notes: vec!["Available for peer networking".to_string()],
+            origin: DiscoveryOrigin::Sample,
         },
     ]
 }
