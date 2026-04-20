@@ -617,7 +617,12 @@ pub fn parse_linux_ip_link(input: &str) -> Vec<NetworkInterface> {
             continue;
         };
 
-        let device = device_part.trim().trim_end_matches('@').to_string();
+        let device = device_part
+            .trim()
+            .split('@')
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let lower = details_part.to_lowercase();
         let status = if lower.contains("state up") {
             InterfaceStatus::Connected

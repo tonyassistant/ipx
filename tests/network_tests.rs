@@ -167,7 +167,7 @@ fn sample_interfaces_include_service_model() {
 fn parses_linux_ip_link_output() {
     let input = r#"
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN mode DEFAULT group default
-2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP mode DEFAULT group default link/ether 52:54:00:12:34:56
+2: eth0@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP mode DEFAULT group default link/ether 52:54:00:12:34:56
 3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN mode DEFAULT group default link/ether 02:42:aa:bb:cc:dd
 "#;
 
