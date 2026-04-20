@@ -152,6 +152,7 @@ pub struct NetworkInterface {
 pub enum ReachabilityState {
     Reachable,
     PrivateRoute,
+    LinkLocalOnly,
     LocalOnly,
     Down,
     Unknown,
@@ -162,6 +163,7 @@ impl ReachabilityState {
         match self {
             Self::Reachable => "reachable",
             Self::PrivateRoute => "private route",
+            Self::LinkLocalOnly => "link-local only",
             Self::LocalOnly => "local only",
             Self::Down => "down",
             Self::Unknown => "unknown",
@@ -172,6 +174,7 @@ impl ReachabilityState {
         match self {
             Self::Reachable => "Internet path appears available",
             Self::PrivateRoute => "Default route is present on a private upstream path",
+            Self::LinkLocalOnly => "Interface only has a link-local address and no verified upstream path",
             Self::LocalOnly => "Interface has a local address but no verified upstream path",
             Self::Down => "No active path detected for this interface",
             Self::Unknown => "Reachability has not been evaluated yet",
@@ -197,6 +200,8 @@ impl NetworkInterface {
                 (Some(ip), None) => {
                     if is_globally_routable_ipv4(ip) {
                         ReachabilityState::Reachable
+                    } else if is_link_local_ipv4(ip) {
+                        ReachabilityState::LinkLocalOnly
                     } else {
                         ReachabilityState::LocalOnly
                     }
@@ -907,6 +912,15 @@ fn sanitize_windows_device_name(name: &str) -> String {
 
 fn is_globally_routable_ipv4(ip: &str) -> bool {
     !is_private_or_special_ipv4(ip)
+}
+
+fn is_link_local_ipv4(ip: &str) -> bool {
+    let octets = ip
+        .split('.')
+        .map(str::parse::<u8>)
+        .collect::<Result<Vec<_>, _>>();
+
+    matches!(octets.as_deref(), Ok([169, 254, _, _]))
 }
 
 fn is_private_or_special_ipv4(ip: &str) -> bool {

@@ -332,6 +332,15 @@ fn sample_interfaces_expose_expected_reachability_states() {
 }
 
 #[test]
+fn link_local_samples_surface_link_local_only_state() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("169.254.44.2".to_string());
+    interfaces[0].gateway = None;
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::LinkLocalOnly);
+}
+
+#[test]
 fn public_ipv4_without_gateway_is_still_treated_as_reachable() {
     let mut interfaces = sample_interfaces();
     interfaces[0].ipv4 = Some("8.8.8.8".to_string());

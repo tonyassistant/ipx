@@ -246,6 +246,15 @@ fn multicast_and_reserved_ranges_are_not_treated_as_public_reachability() {
 }
 
 #[test]
+fn link_local_address_without_gateway_is_classified_separately() {
+    let mut interfaces = sample_interfaces();
+    interfaces[0].ipv4 = Some("169.254.10.20".to_string());
+    interfaces[0].gateway = None;
+
+    assert_eq!(interfaces[0].reachability(), ReachabilityState::LinkLocalOnly);
+}
+
+#[test]
 fn builds_windows_interfaces_from_ipconfig() {
     let input = r#"
 Windows IP Configuration

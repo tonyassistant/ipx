@@ -701,6 +701,7 @@ fn reachability_style(state: ReachabilityState) -> Style {
     match state {
         ReachabilityState::Reachable => Style::default().fg(Color::Green),
         ReachabilityState::PrivateRoute => Style::default().fg(Color::Yellow),
+        ReachabilityState::LinkLocalOnly => Style::default().fg(Color::Magenta),
         ReachabilityState::LocalOnly => Style::default().fg(OPERATOR_AMBER),
         ReachabilityState::Down | ReachabilityState::Unknown => Style::default().fg(OPERATOR_MUTED),
     }
